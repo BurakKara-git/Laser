@@ -10,8 +10,6 @@ import datetime
 import threading
 from zaber_motion import Units
 from zaber_motion.ascii import Connection
-from pynput.keyboard import Key
-from pynput import keyboard
 
 #Convert Degree to Energy
 energies = {20:1.500, 25:1.465, 30:1.395, 35: 1.200, 40:0.995, 45:0.715, 50:0.475, 60: 0.105}
@@ -54,7 +52,7 @@ def done(MSG,color):
     print_msg(MSG,color)
     extract_btn.config(state=NORMAL)
     set_btn.config(state=NORMAL)
-    bar.destroy()
+    bar['value'] = 0
     progress_text.config(fg = color) 
         
 def runner(dia,x_length,y_increament,energy,initial_vel,stop):
@@ -62,15 +60,10 @@ def runner(dia,x_length,y_increament,energy,initial_vel,stop):
     
     global log_tail
     log_tail = []
-
-    global bar
-    global progress_text
-    bar = Progressbar(window, length=200, style='black.Horizontal.TProgressbar')
-    bar['value'] = 0
-    bar.grid(column=0, row=11)
     
     extract_btn.config(state=DISABLED)
     set_btn.config(state=DISABLED)
+    
     
     forN = int((dia+5)/y_increament)
     if forN %2 == 0:
@@ -78,8 +71,7 @@ def runner(dia,x_length,y_increament,energy,initial_vel,stop):
     max_velocity = initial_vel*(forN)    
     passed = 0
 
-    progress_text = Label(window, text= "0/{}".format(forN), font=("Arial Bold", 10), fg="green")
-    progress_text.grid(column=1, row=11)
+    
 
     for n in range(1,forN+1):
 
@@ -88,7 +80,7 @@ def runner(dia,x_length,y_increament,energy,initial_vel,stop):
 
         else:
             bar['value'] = (n/forN)*100
-            progress_text.config(text = str(n) + "/{}".format(forN))
+            progress_text.config(text = "Task: {}/{}".format(n,forN), fg = "green")
 
             #Set Position and Velocities
             x_velocity = max_velocity - initial_vel*(n-passed)
@@ -118,13 +110,14 @@ def runner(dia,x_length,y_increament,energy,initial_vel,stop):
             """
             logger(n,energy,x_position,x_velocity,y_position,y_velocity, avg_x_velocity)
             sleep(0.02)
-            print(avg_x_velocity)
+            print("Task: {}/{}, {}".format(n,forN,avg_x_velocity,avg_x_velocity) )
 
     #Write the Data
     if not start_event.is_set():
+        writer()
+        switch_runner()
         MSG = "COMPLETED THE TASK"
         done(MSG, "green")
-        writer()
 
 def extractor():
     """
@@ -263,6 +256,13 @@ if __name__ == "__main__":
 
         set_degree_text = Label(window, text="Degree", font=("Arial Bold", 20))
         set_degree_text.grid(column=0, row=9)
+
+        bar = Progressbar(window, length=200, style='black.Horizontal.TProgressbar')
+        bar['value'] = 0
+        bar.grid(column=0, row=11)
+
+        progress_text = Label(window, text= "", font=("Arial Bold", 10), fg="green")
+        progress_text.grid(column=1, row=11)
         
         """
         connection.enable_alerts()
@@ -288,9 +288,7 @@ if __name__ == "__main__":
         run_btn = Button(window, text="RUN", command = lambda: switch_runner())
         run_btn.grid(column=0, row=10)
         
-        extract_btn = Button(window, text="EXTRACT", command=extractor)  
+        extract_btn = Button(window, text="EXTRACT", command = extractor)  
         extract_btn.grid(column = 0, row = 12)
 
-        
-        
         window.mainloop()
