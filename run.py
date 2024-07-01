@@ -48,66 +48,68 @@ def writer():
 def print_msg(MSG,color):
     lbl.configure(text= MSG, fg=color)
 
+#Configure Run/Stop Messages
 def done(MSG,color):
     print_msg(MSG,color)
     extract_btn.config(state=NORMAL)
     set_btn.config(state=NORMAL)
     bar['value'] = 0
     progress_text.config(fg = color) 
-        
+
+#Run the task        
 def runner(dia,x_length,y_increament,energy,initial_vel,stop):
     print_msg("RUNNING THE TASK","green")
     
     global log_tail
     log_tail = []
     
+    #Disable Extract/Set Buttons
     extract_btn.config(state=DISABLED)
-    set_btn.config(state=DISABLED)
+    set_btn.config(state=DISABLED)    
     
-    
-    forN = int((dia+5)/y_increament)
+    #Calculate For Loop Number
+    forN = int((dia)/y_increament)
     if forN %2 == 0:
         forN += 1
     max_velocity = initial_vel*(forN)    
-    passed = 0
-
-    
+    passed = 0    
 
     for n in range(1,forN+1):
 
+        #Break the Loop is Stop Button is Pressed
         if start_event.is_set():
+            writer()
             break
-
+        
+        #Run the Task
         else:
+            #Configure Progress Bar and Progress Text
             bar['value'] = (n/forN)*100
             progress_text.config(text = "Task: {}/{}".format(n,forN), fg = "green")
 
             #Set Position and Velocities
-            x_velocity = max_velocity - initial_vel*(n-passed)
+            x_velocity = max_velocity - initial_vel*(n-passed) #Fast to Slow
+            #x_velocity = initial_vel*(n-passed) #Slow to Fast
             x_position = x_length*(-1)**(n+1+passed)
             y_position = y_increament
             y_velocity = 0        
 
             if n != int(forN/2)+1:
                 start = time.time()
-                """
                 axisx.move_relative(position=x_position, unit = Units.LENGTH_MILLIMETRES, 
                         velocity=x_velocity, velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND
                         )
                 end = time.time()
                 avg_x_velocity = x_length/(end-start)
-                """
-                avg_x_velocity = "DONE"
 
             #Pass The Middle Movement
             else:
                 avg_x_velocity = "PASSED"
-                passed += 1        
-            """
+                passed += 1
             axisy.move_relative(position=y_position, unit = Units.LENGTH_MILLIMETRES, 
                         velocity=y_velocity, velocity_unit = Units.VELOCITY_MILLIMETRES_PER_SECOND
                         )
-            """
+            #Log the Task
             logger(n,energy,x_position,x_velocity,y_position,y_velocity, avg_x_velocity)
             sleep(0.02)
             print("Task: {}/{}, {}".format(n,forN,avg_x_velocity,avg_x_velocity) )
@@ -119,15 +121,15 @@ def runner(dia,x_length,y_increament,energy,initial_vel,stop):
         MSG = "COMPLETED THE TASK"
         done(MSG, "green")
 
+#Extract the Sample
 def extractor():
-    """
-    axisx.move_absolute(40, Units.LENGTH_MILLIMETRES)
-    axisy.move_absolute(60, Units.LENGTH_MILLIMETRES)
-    axisz.move_absolute(24, Units.LENGTH_MILLIMETRES)    
-    """
+    axisz.move_absolute(24, Units.LENGTH_MILLIMETRES)
+    axisy.move_absolute(60, Units.LENGTH_MILLIMETRES) 
+    axisx.move_absolute(40, Units.LENGTH_MILLIMETRES)       
     
     print_msg("SAMPLE IS EXTRACTED", "green")
 
+#Set Initial Positions
 def setter():
     deg = set_degree.get()
     energy = Deg_2_Energy(int(deg))
@@ -135,18 +137,21 @@ def setter():
     set_list = [set_initial_x, set_initial_y, set_initial_z, set_initial_rot, set_y_increament,
                 set_dia, set_x_length, set_initial_vel, set_degree]
 
+    #Destroy the previous Messages at column 2
     for widget in window.grid_slaves(column=2):
        if (widget in  window.grid_slaves(row=0)):
            pass
        else:
            widget.destroy()
     
+    #Destroy the previous Messages at column 3
     for widget in window.grid_slaves(column=3):
        if (widget in  window.grid_slaves(row=0)):
            pass
        else:
            widget.destroy()
 
+    #Print Set Messages
     for i in range (len(set_list)):
         text = Label(window, font=("Arial Bold", 20), fg="green")
         text.configure(text = set_list[i].get())
@@ -155,22 +160,23 @@ def setter():
     text_energy = Label(window, text= "({} mJ)".format(energy), font=("Arial Bold", 20), fg="green")
     text_energy.grid(column = 3, row=9)
 
+    #Get Initial Position Values
     global initial_x, initial_y, initial_z, initial_rot
     initial_x = set_initial_x.get()
     initial_y = set_initial_y.get() 
     initial_z = set_initial_z.get() 
-    initial_rot = set_initial_rot.get() 
+    initial_rot = set_initial_rot.get()
     
-    """
     #Initial Positions
     axisx.move_absolute(float(initial_x), Units.LENGTH_MILLIMETRES)
     axisy.move_absolute(float(initial_y), Units.LENGTH_MILLIMETRES)
     axisz.move_absolute(float(initial_z), Units.LENGTH_MILLIMETRES)
-    axisrot.move_absolute(float(initial_rot),Units.NATIVE)    
-    """
+    axisrot.move_absolute(float(initial_rot),Units.NATIVE)
 
     print_msg("INITIAL VALUES ARE SET", "green")
 
+#Entry With PlaceHolder Class
+#https://stackoverflow.com/questions/27820178/how-to-add-placeholder-to-an-entry-in-tkinter
 class EntryWithPlaceholder(Entry):
     def __init__(self, master=None, placeholder="PLACEHOLDER", axis= "PLACEHOLDER" , row=0, col=0, color='grey'):
         super().__init__(master)
@@ -201,8 +207,13 @@ class EntryWithPlaceholder(Entry):
         if not self.get():
             self.put_placeholder()
 
+#Exit Button
+def exit_button():
+    extractor()
+    window.destroy()
+
+#Run/Stop Button Controller
 def switch_runner():
-    setter()
     dia = float(set_dia.get())
     x_length = float(set_x_length.get())
     y_increament = float(set_y_increament .get())
@@ -211,33 +222,38 @@ def switch_runner():
     initial_vel = float(set_initial_vel.get())
 
     if start_event.is_set():
+        setter()
         thread_runner = threading.Thread(target = runner, args = (dia,x_length,y_increament,energy,initial_vel, start_event))
         thread_runner.daemon = True
         run_btn.config(text= "STOP")
         start_event.clear()
         thread_runner.start()
     else:
+        axisz.move_absolute(24, Units.LENGTH_MILLIMETRES)
         run_btn.config(text = "RUN")
         start_event.set()
         MSG = "STOPPED THE TASK"
         done(MSG, "red")
         thread_runner = None
+        extractor()
 
 if __name__ == "__main__":
-    #with Connection.open_serial_port("COM3") as connection:
+    with Connection.open_serial_port("COM3") as connection: #Connect the Device
         delete_list = []
+
+        #Configure Main Window
         window = Tk()
         window.title("Stage Controller")
-        window.geometry('1280x720')
-        
+        window.geometry('1280x720')        
 
+        #Initialize Buttons and Texts
         lbl = Label(window, text="Set Parameters", font=("Arial Bold", 20))
         lbl.grid(column=0, row=0)
 
         set_btn = Button(window, text="Set", command=setter)
         set_btn.grid(column=1, row=0)
 
-        exit_btn = Button(window, text="EXIT", command= lambda: window.destroy())  
+        exit_btn = Button(window, text="EXIT", command= exit_button)  
         exit_btn.grid(column = 3, row = 0)
 
         set_initial_x = EntryWithPlaceholder(window, 0.0, "X", 1, 0)
@@ -257,6 +273,7 @@ if __name__ == "__main__":
         set_degree_text = Label(window, text="Degree", font=("Arial Bold", 20))
         set_degree_text.grid(column=0, row=9)
 
+        #Initialize Progress Bar
         bar = Progressbar(window, length=200, style='black.Horizontal.TProgressbar')
         bar['value'] = 0
         bar.grid(column=0, row=11)
@@ -264,7 +281,7 @@ if __name__ == "__main__":
         progress_text = Label(window, text= "", font=("Arial Bold", 10), fg="green")
         progress_text.grid(column=1, row=11)
         
-        """
+        #Establish Conenctions
         connection.enable_alerts()
 
         device_list = connection.detect_devices()
@@ -279,15 +296,16 @@ if __name__ == "__main__":
         axisx = devicex.get_axis(1)
         axisy = devicey.get_axis(1)
         axisz = devicez.get_axis(1)
-        axisrot = devicerot.get_axis(1) 
-        """
+        axisrot = devicerot.get_axis(1)
 
+        #Start Tasks as a Thread
         start_event = threading.Event()
         start_event.set()
         
         run_btn = Button(window, text="RUN", command = lambda: switch_runner())
         run_btn.grid(column=0, row=10)
         
+        #Extract the Sample Button
         extract_btn = Button(window, text="EXTRACT", command = extractor)  
         extract_btn.grid(column = 0, row = 12)
 
