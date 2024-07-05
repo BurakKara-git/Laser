@@ -44,7 +44,7 @@ def writer():
         write.writerow(log_head)
         write.writerows(log_tail)
 
-# Configure Top Message
+# Configure the Top Message
 def print_msg(MSG,color):
     lbl.configure(text= MSG, fg=color)
 
