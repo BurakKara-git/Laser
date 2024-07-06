@@ -95,98 +95,211 @@ def stop_axes(axes):
         axis.stop()
 
 #Find Z-Axis Focus
-def z_test(stop_event):
-    if stop_event.is_set():        
-        axisz.stop()
-    else:
-        axisz.move_absolute(position=constants.Z_MAX, 
+def z_test(stop_event, resume_event):
+    initial_z = float(set_initial_z.get())
+    lock.acquire()
+    axisz.move_absolute(position=initial_z, 
                             unit = Units.LENGTH_MILLIMETRES)
-        wait_axes([axisz])       
-        axisz.move_absolute(position=constants.Z_MIN, 
-                            unit = Units.LENGTH_MILLIMETRES,
-                            velocity=constants.Z_TEST_VELOCITY,
-                            velocity_unit= Units.VELOCITY_MILLIMETRES_PER_SECOND)    
+    wait_axes([axisz])
+
+    total_step = int((1 + initial_z - constants.Z_MIN)/constants.Z_TEST_STEP)
+
+    if total_step <= 0:
+        print_msg("SET HIGHER Z VALUE")
+        return
+
+    count = 0
+    while not stop_event.is_set():
+        while not pause_event.is_set():
+            time.sleep(1)
+        count += 1
+        bar['value'] = (count)/(total_step)*100
+        progress_text.config(text = "Task: {}/{}".format(count,total_step), fg = "green")
+        new_pos = initial_z - count*constants.Z_TEST_STEP
+        if new_pos <= constants.Z_MIN:
+            axisz.move_absolute(position= constants.Z_MIN, 
+                                unit = Units.LENGTH_MILLIMETRES)
+            z_test_btn.invoke()
+            print_msg("REACHED MINIMUM Z AXIS", "red")
+            lock.release()
+            return
+        else:
+            axisz.move_absolute(position= new_pos, 
+                                unit = Units.LENGTH_MILLIMETRES)
+    
+    lock.release()
+
+#Print Matrix
+def mat_print(mat, stop_event, resume_event):
+    threshold = 255
+    initial_z = float(set_initial_z.get()) 
+    rows = len(mat)
+    cols = len(mat[0])
+    print("Matrix Dimension: ", rows, cols)
+
+    y_step = constants.Y_MAX/rows
+    x_step = constants.X_MAX/cols
+    progress_text.config(text = "Task: {}/{}".format(0,rows*(cols-1)), fg = "green")
+
+    lock.acquire()
+
+    #unfocus
+    axisz.move_absolute(position=constants.Z_MAX,
+                         unit=Units.LENGTH_MILLIMETRES)
+    count = 0
+    bar['value'] = 0
+    for row in range(rows):
+        x_pos = y_step*row
+        #move to x position
+        axisx.move_absolute(position=x_pos,
+                         unit=Units.LENGTH_MILLIMETRES)
+        for col in range(cols-1):
+            bar['value'] = ((count+1)/(rows*(cols-1)))*100
+            progress_text.config(text = "Task: {}/{}".format(count+1,rows*(cols-1)), fg = "green")
+            count += 1
+
+            while not resume_event.is_set():         
+                time.sleep(1)
+            
+            #Return if Stop Button is Pressed
+            if stop_event.is_set():
+                axisz.move_absolute(position=constants.Z_MAX,
+                                unit=Units.LENGTH_MILLIMETRES)
+                lock.release()
+                return               
+
+            y_pos = x_step*col
+            #move to y position
+            axisy.move_absolute(position=y_pos,
+                         unit=Units.LENGTH_MILLIMETRES)
+            if mat[row][col] == threshold:
+                #focus
+                axisz.move_absolute(position=initial_z,
+                         unit=Units.LENGTH_MILLIMETRES)
+                if mat[row][col+1] == threshold:
+                    next_y_pos = x_step*(col+1)
+                    #move to next y position
+                    axisy.move_absolute(position=next_y_pos,
+                         unit=Units.LENGTH_MILLIMETRES)
+            
+            else:
+                #unfocus
+                axisz.move_absolute(position=constants.Z_MAX,
+                         unit=Units.LENGTH_MILLIMETRES)
+        #unfocus
+        axisz.move_absolute(position=constants.Z_MAX,
+                         unit=Units.LENGTH_MILLIMETRES)
+    lock.release()
+    mat_print_btn.invoke()
 
 #Run the task        
 def runner(stop_event, resume_event):
-    run_lock.acquire()
+    global log_tail
+    log_tail = []
     dia = float(set_dia.get())
     x_length = float(set_x_length.get())
     y_increment = float(set_y_increment .get())
     deg = float(set_degree.get())
     energy = float(functions.Deg_2_Energy(int(deg)))
     initial_vel = float(set_initial_vel.get())
-    
-    global log_tail
-    log_tail = []
 
-    #Calculate For Loop Number
-    forN = int((dia)/y_increment)
-    if forN > constants.MAX_X_VEL:
+    #Calculate Total Task
+    total_task = int((dia)/y_increment)
+    if total_task > constants.MAX_X_VEL:
         print("ERROR - CANNOT DO TASKS WITH VELOCITIES:")
-        while forN > constants.MAX_X_VEL:
-            max_velocity = initial_vel*(forN)
-            forN -= 1            
+        while total_task > constants.MAX_X_VEL:
+            max_velocity = initial_vel*(total_task)
+            total_task -= 1            
             print(max_velocity, end = ", ")
-    if forN %2 == 0:
-        max_velocity = initial_vel*(forN)
+    if total_task %2 == 0:
+        max_velocity = initial_vel*(total_task)
         print(max_velocity)
-        forN -= 1
+        total_task -= 1
 
-    max_velocity = initial_vel*forN
+    #Calculate Max Velocity
+    max_velocity = initial_vel*total_task
     passed = 0
+    count = 0
 
-    for n in range(1,forN+1):
-        #Wait axes to finish task
-        wait_axes([axisx, axisy, axisz, axisrot])
-               
-        #Pause the Task
+    lock.acquire()
+    while not stop_event.is_set():
         while not resume_event.is_set():
             time.sleep(1)
 
-        #Return if Stop Button is Pressed
-        if stop_event.is_set():
-            run_lock.release()
+        #Wait axes to finish task
+        wait_axes([axisx, axisy, axisz, axisrot])
+
+        if count == total_task:
+            functions.writer(constants.log_head, log_tail)
+            lock.release()
+            run_btn.invoke()
             return
         
-        #Run the Task
         else:
-            #Configure Progress Bar and Progress Text
-            bar['value'] = (n/forN)*100
-            progress_text.config(text = "Task: {}/{}".format(n,forN), fg = "green")
+            count += 1
+            bar['value'] = (count/total_task)*100
+            progress_text.config(text = "Task: {}/{}".format(count,total_task), fg = "green")
 
             #Set Position and Velocities
-            x_velocity = max_velocity - initial_vel*(n-passed) #Fast to Slow
-            #x_velocity = initial_vel*(n-passed) #Slow to Fast
-            x_position = x_length*(-1)**(n+1+passed)
+            x_velocity = max_velocity - initial_vel*(count-passed) #Fast to Slow
+            #x_velocity = initial_vel*(count-passed) #Slow to Fast
+            x_position = x_length*(-1)**(count+1+passed)
             y_position = y_increment
-            y_velocity = 0        
+            y_velocity = 0
+            avg_x_velocity = "EMPTY"
 
-            if n != int(forN/2)+1:
-                start = time.time()
-                
-                axisx.move_relative(position=x_position,
-                                     unit = Units.LENGTH_MILLIMETRES,
-                                     velocity=x_velocity,
-                                     velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
-                
-                end = time.time()
-                avg_x_velocity = x_length/(end-start)
+            #Return if Stop Button is Pressed
+            if stop_event.is_set():
+                functions.writer(constants.log_head, log_tail)
+                lock.release()
+                return
+            
+            #Check Ranges
+            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position > constants.X_MAX:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Max X Range", "red")
+                lock.release()
+                return
+            
+            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position < constants.X_MIN:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Min X Range", "red")
+                lock.release()
+                return
+            
+            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position > constants.Y_MAX:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Max Y Range", "red")
+                lock.release()
+                return
+            
+            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position < constants.Y_MIN:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Min Y Range", "red")
+                lock.release()
+                return
+            
+            #Start Movement
+            if count != int(total_task/2)+1:
+                    start = time.time()
+                    axisx.move_relative(position=x_position,
+                                        unit = Units.LENGTH_MILLIMETRES,
+                                        velocity=x_velocity,
+                                        velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
+                    
+                    end = time.time()
+                    avg_x_velocity = x_length/(end-start)                
 
             #Pass The Middle Movement
             else:
-                avg_x_velocity = "PASSED"
-                passed += 1
-            
-            axisy.move_relative(position=y_position, unit = Units.LENGTH_MILLIMETRES, 
-                    velocity=y_velocity, velocity_unit = Units.VELOCITY_MILLIMETRES_PER_SECOND)
-            
+                    avg_x_velocity = "PASSED"
+                    passed += 1
+                    axisy.move_relative(position=y_position, unit = Units.LENGTH_MILLIMETRES, 
+                        velocity=y_velocity, velocity_unit = Units.VELOCITY_MILLIMETRES_PER_SECOND)
+                
             #Log the Task
-            functions.logger(n,energy,x_position,x_velocity,y_position,y_velocity, avg_x_velocity)
-            print("Task: {}/{}, {}".format(n,forN,avg_x_velocity,avg_x_velocity))
-    
-    run_lock.release()
-    run_btn.invoke()
+            log_tail = functions.logger(log_tail, count, energy, x_position, x_velocity, y_position, y_velocity, avg_x_velocity)
+            print("Task: {}/{}, {}".format(count, total_task, avg_x_velocity))
 
 if __name__ == "__main__":
     Library.enable_device_db_store()
@@ -199,15 +312,12 @@ if __name__ == "__main__":
         window.geometry('1280x720')
 
         #Initialize Thread Events
-        run_start_event = threading.Event()
-        run_start_event.set()
+        start_event = threading.Event()
+        start_event.set()
 
-        z_test_start_event = threading.Event()
-        z_test_start_event.set()
+        pause_event = threading.Event()
 
-        run_pause_event = threading.Event()
-
-        run_lock = threading.Lock()     
+        lock = threading.Lock()     
 
         #Initialize Texts
         lbl = Label(window, text="Stage Controller Is Ready", font=("Arial Bold", 20), fg= "green")
@@ -268,15 +378,16 @@ if __name__ == "__main__":
         check_device_thread.start()
 
         #Z-Test Button
-        z_test_initial_functions = [lambda: print_msg("STARTED Z TEST", "green"),
+        z_test_initial_functions = [lambda: pause_event.set(),
+                                    lambda: print_msg("STARTED Z TEST", "green"),
                                     lambda: z_test_btn.config(text="Stop Z-Test")]
         
         z_test_final_functions = [lambda: print_msg("Z Test Result: " + str(axisz.get_position(unit=Units.LENGTH_MILLIMETRES)), "green"),
                                   lambda: z_test_btn.config(text="Start Z-Test")]
         
         z_test_command = lambda: functions.thread_switch(z_test, 
-                                               z_test_start_event,
-                                               (z_test_start_event,),
+                                               start_event,
+                                               (start_event, pause_event),
                                                z_test_initial_functions,
                                                z_test_final_functions)
         
@@ -288,26 +399,27 @@ if __name__ == "__main__":
         runner_initial_functions = [lambda: extract_btn.config(state=DISABLED),
                                     lambda: set_btn.config(state=DISABLED),
                                     lambda: z_test_btn.config(state=DISABLED),
-                                    lambda: run_pause_event.set(),
+                                    lambda: mat_print_btn.config(state=DISABLED),
+                                    lambda: pause_event.set(),
                                     lambda: setter(window),
                                     lambda: print_msg("RUNNING THE TASK","green"),
                                     lambda: progress_text.config(fg = "green"),
                                     lambda: run_btn.config(text = "STOP")]
 
-        runner_final_functions = [lambda: functions.writer(),
-                                  lambda: extractor(),                                  
+        runner_final_functions = [lambda: extractor(),                                  
                                   lambda: extract_btn.config(state=NORMAL),
                                   lambda: set_btn.config(state=NORMAL),
                                   lambda: z_test_btn.config(state=NORMAL),
-                                  lambda: run_pause_event.clear(),
+                                  lambda: mat_print_btn.config(state=NORMAL),
+                                  lambda: pause_event.clear(),
                                   lambda: pause_btn.config(text="PAUSE"),
                                   lambda: print_msg("STOPPED THE TASK", "red"),
                                   lambda: progress_text.config(fg = "red"),
                                   lambda: run_btn.config(text = "RUN")]
         
         runner_command = lambda: functions.thread_switch(runner, 
-                                               run_start_event,
-                                               (run_start_event, run_pause_event),
+                                               start_event,
+                                               (start_event, pause_event),
                                                runner_initial_functions,
                                                runner_final_functions)
 
@@ -321,11 +433,39 @@ if __name__ == "__main__":
         pause_final_functions = [lambda: print_msg("RESUMED THE TASK", "green"),
                                  lambda: pause_btn.config(text= "PAUSE")]
         
-        pause_command = lambda: functions.thread_switch(None, run_pause_event, None, pause_initial_functions, pause_final_functions)
+        pause_command = lambda: functions.thread_switch(None, pause_event, None, pause_initial_functions, pause_final_functions)
         pause_btn = Button(window, text="PAUSE", command = pause_command) #Requested by Sena
         pause_btn.grid(column=0, row=10)
+
+        #Matrix Print Button
+        mat = functions.img_2_mat(constants.IMAGE_PATH)
+        mat_print_initial_functions =[lambda: extract_btn.config(state=DISABLED),
+                                      lambda: set_btn.config(state=DISABLED),
+                                      lambda: z_test_btn.config(state=DISABLED),
+                                      lambda: run_btn.config(state=DISABLED),
+                                      lambda: pause_event.set(),
+                                      lambda: print_msg("PRINTING MATRIX", "green"),
+                                      lambda: mat_print_btn.config(text= "Stop Matrix Print")]
+        
+        mat_print_final_functions = [lambda: extract_btn.config(state=NORMAL),
+                                     lambda: set_btn.config(state=NORMAL),
+                                     lambda: z_test_btn.config(state=NORMAL),
+                                     lambda: run_btn.config(state=NORMAL),
+                                     lambda: pause_event.clear(),
+                                     lambda: pause_btn.config(text="PAUSE"),
+                                     lambda: print_msg("STOPPED MATRIX", "red"),
+                                     lambda: mat_print_btn.config(text = "Start Matrix Print")]
+        
+        mat_print_command = lambda: functions.thread_switch(mat_print, 
+                                                            start_event, 
+                                                            (mat, start_event, pause_event),
+                                                            mat_print_initial_functions,
+                                                            mat_print_final_functions)
+        
+        mat_print_btn = Button(window, text="Start Matrix Print (IN DEVELOPMENT)", command = mat_print_command)
+        mat_print_btn.grid(column = 4, row = 10)
         
         #Extract Button
         extract_btn = Button(window, text="EXTRACT", command = lambda: extractor())  
-        extract_btn.grid(column = 0, row = 12)
+        extract_btn.grid(column = 5, row = 10)
         window.mainloop()

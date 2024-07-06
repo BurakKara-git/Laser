@@ -1,4 +1,4 @@
-import threading, os, datetime, constants, csv
+import threading, os, datetime, constants, csv, cv2
 
 #Convert Degree to Energy
 energies = {20:1.500, 25:1.465, 30:1.395, 35: 1.200, 40:0.995, 45:0.715, 50:0.475, 60: 0.105}
@@ -7,16 +7,14 @@ def Deg_2_Energy(deg):
     return energy
 
 #Logger
-log_head = ["N","Energy(mJ)","X_Position(mm-Rel)", "X_Velocity(mm/s)", "Y_Position(mm-Rel)", "Y_Velocity(mm/s)",
-            "Avg_X_Velocity(mm/s)", "Initial_X(mm)", "Initial_Y(mm)", "Initial_Z(mm)", "Initial_Rot(native)" ]
-log_tail = []
-def logger(n,energy,x_position,x_velocity,y_position,y_velocity, avg_x_velocity):
+def logger(log_tail, n,energy,x_position,x_velocity,y_position,y_velocity, avg_x_velocity):
     log = [n,energy,x_position,x_velocity,y_position,y_velocity,
           avg_x_velocity,constants.INITIAL_X,constants.INITIAL_Y,constants.INITIAL_Z,constants.INITIAL_ROT]
     log_tail.append(log)
+    return log_tail
 
 #Write the File
-def writer():
+def writer(log_head, log_tail):
     current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     filename = f'{current_datetime}.csv'
     
@@ -55,3 +53,9 @@ def thread_switch(main_function, start_event, args, initial_functions, final_fun
                         thread = None                        
                 except:
                     pass
+
+#Change image to binary matrix
+def img_2_mat(img_path):
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    th = cv2.adaptiveThreshold(img, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+    return th 
