@@ -1,7 +1,7 @@
 #Import Libraries
 from tkinter import *
 from tkinter.ttk import Progressbar, Combobox
-from zaber_motion import Units, Library, LogOutputMode
+from zaber_motion import Units, Library, MotionLibException
 from zaber_motion.ascii import Connection, WarningFlags
 import time, threading, constants, classes, functions
 
@@ -115,6 +115,8 @@ def z_test(stop_event, resume_event):
         count += 1
         bar['value'] = (count)/(total_step)*100
         progress_text.config(text = "Task: {}/{}".format(count,total_step), fg = "green")
+        set_initial_z.delete('0', 'end')
+        set_initial_z.insert(0, str(axisz.get_position(unit=Units.LENGTH_MILLIMETRES)))
         new_pos = initial_z - count*constants.Z_TEST_STEP
         if new_pos <= constants.Z_MIN:
             axisz.move_absolute(position= constants.Z_MIN, 
@@ -128,6 +130,122 @@ def z_test(stop_event, resume_event):
                                 unit = Units.LENGTH_MILLIMETRES)
     
     lock.release()
+
+#Run the task        
+def runner(stop_event, resume_event):
+    global log_tail
+    log_tail = []
+    dia = float(set_dia.get())
+    x_length = float(set_x_length.get())
+    y_increment = float(set_y_increment .get())
+    deg = float(set_degree.get())
+    energy = float(functions.Deg_2_Energy(int(deg)))
+    initial_vel = float(set_initial_vel.get())
+
+    #Calculate Total Task
+    total_task = int((dia)/y_increment)
+    if total_task > constants.MAX_X_VEL:
+        print("ERROR - CANNOT DO TASKS WITH VELOCITIES:")
+        while total_task > constants.MAX_X_VEL:
+            max_velocity = initial_vel*(total_task)
+            total_task -= 1            
+            print(max_velocity, end = ", ")
+    if total_task %2 == 0:
+        max_velocity = initial_vel*(total_task)
+        print(max_velocity)
+        total_task -= 1
+
+    #Calculate Max Velocity
+    max_velocity = initial_vel*total_task
+    passed = 0
+    count = 0
+
+    lock.acquire()
+    while not stop_event.is_set():
+        while not resume_event.is_set():
+            time.sleep(1)
+
+        #Wait axes to finish task
+        wait_axes([axisx, axisy, axisz, axisrot])
+
+        if count == total_task:
+            functions.writer(constants.log_head, log_tail)
+            lock.release()
+            run_btn.invoke()
+            return
+        
+        else:
+            count += 1
+            bar['value'] = (count/total_task)*100
+            progress_text.config(text = "Task: {}/{}".format(count,total_task), fg = "green")
+
+            #Set Position and Velocities
+            x_velocity = max_velocity - initial_vel*(count-passed) #Fast to Slow
+            #x_velocity = initial_vel*(count-passed) #Slow to Fast
+            x_position = x_length*(-1)**(count+1+passed)
+            y_position = y_increment
+            y_velocity = 0
+            avg_x_velocity = "EMPTY"
+            
+            #Check Ranges
+            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position > constants.X_MAX:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Max X Range", "red")
+                lock.release()
+                return
+            
+            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position < constants.X_MIN:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Min X Range", "red")
+                lock.release()
+                return
+            
+            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position > constants.Y_MAX:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Max Y Range", "red")
+                lock.release()
+                return
+            
+            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position < constants.Y_MIN:
+                functions.writer(constants.log_head, log_tail)
+                print_msg("Reached Min Y Range", "red")
+                lock.release()
+                return
+            
+            #Start Movement
+            if count != int(total_task/2)+1:
+                    start = time.time()
+
+                    try:
+                        axisx.move_relative(position=x_position,
+                                        unit = Units.LENGTH_MILLIMETRES,
+                                        velocity=x_velocity,
+                                        velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
+                    
+                        end = time.time()
+                        avg_x_velocity = x_length/(end-start)
+                    except MotionLibException as err:
+                        print(err)
+                        avg_x_velocity = "ERROR"                
+
+            #Pass The Middle Movement
+            else:
+                    avg_x_velocity = "PASSED"
+                    passed += 1
+
+            try:
+                axisy.move_relative(position=y_position, unit = Units.LENGTH_MILLIMETRES, 
+                    velocity=y_velocity, velocity_unit = Units.VELOCITY_MILLIMETRES_PER_SECOND)
+            except MotionLibException as err:
+                print(err)
+            
+            #Log the Task
+            log_tail = functions.logger(log_tail, count, energy, x_position, x_velocity, y_position, y_velocity, avg_x_velocity)
+            print("Task: {}/{}, {}".format(count, total_task, avg_x_velocity))
+    
+    functions.writer(constants.log_head, log_tail)
+    lock.release()
+    return
 
 #Print Matrix
 def mat_print(mat, stop_event, resume_event):
@@ -191,115 +309,6 @@ def mat_print(mat, stop_event, resume_event):
                          unit=Units.LENGTH_MILLIMETRES)
     lock.release()
     mat_print_btn.invoke()
-
-#Run the task        
-def runner(stop_event, resume_event):
-    global log_tail
-    log_tail = []
-    dia = float(set_dia.get())
-    x_length = float(set_x_length.get())
-    y_increment = float(set_y_increment .get())
-    deg = float(set_degree.get())
-    energy = float(functions.Deg_2_Energy(int(deg)))
-    initial_vel = float(set_initial_vel.get())
-
-    #Calculate Total Task
-    total_task = int((dia)/y_increment)
-    if total_task > constants.MAX_X_VEL:
-        print("ERROR - CANNOT DO TASKS WITH VELOCITIES:")
-        while total_task > constants.MAX_X_VEL:
-            max_velocity = initial_vel*(total_task)
-            total_task -= 1            
-            print(max_velocity, end = ", ")
-    if total_task %2 == 0:
-        max_velocity = initial_vel*(total_task)
-        print(max_velocity)
-        total_task -= 1
-
-    #Calculate Max Velocity
-    max_velocity = initial_vel*total_task
-    passed = 0
-    count = 0
-
-    lock.acquire()
-    while not stop_event.is_set():
-        while not resume_event.is_set():
-            time.sleep(1)
-
-        #Wait axes to finish task
-        wait_axes([axisx, axisy, axisz, axisrot])
-
-        if count == total_task:
-            functions.writer(constants.log_head, log_tail)
-            lock.release()
-            run_btn.invoke()
-            return
-        
-        else:
-            count += 1
-            bar['value'] = (count/total_task)*100
-            progress_text.config(text = "Task: {}/{}".format(count,total_task), fg = "green")
-
-            #Set Position and Velocities
-            x_velocity = max_velocity - initial_vel*(count-passed) #Fast to Slow
-            #x_velocity = initial_vel*(count-passed) #Slow to Fast
-            x_position = x_length*(-1)**(count+1+passed)
-            y_position = y_increment
-            y_velocity = 0
-            avg_x_velocity = "EMPTY"
-
-            #Return if Stop Button is Pressed
-            if stop_event.is_set():
-                functions.writer(constants.log_head, log_tail)
-                lock.release()
-                return
-            
-            #Check Ranges
-            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position > constants.X_MAX:
-                functions.writer(constants.log_head, log_tail)
-                print_msg("Reached Max X Range", "red")
-                lock.release()
-                return
-            
-            if axisx.get_position(Units.LENGTH_MILLIMETRES) + x_position < constants.X_MIN:
-                functions.writer(constants.log_head, log_tail)
-                print_msg("Reached Min X Range", "red")
-                lock.release()
-                return
-            
-            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position > constants.Y_MAX:
-                functions.writer(constants.log_head, log_tail)
-                print_msg("Reached Max Y Range", "red")
-                lock.release()
-                return
-            
-            if axisy.get_position(Units.LENGTH_MILLIMETRES) + y_position < constants.Y_MIN:
-                functions.writer(constants.log_head, log_tail)
-                print_msg("Reached Min Y Range", "red")
-                lock.release()
-                return
-            
-            #Start Movement
-            if count != int(total_task/2)+1:
-                    start = time.time()
-                    axisx.move_relative(position=x_position,
-                                        unit = Units.LENGTH_MILLIMETRES,
-                                        velocity=x_velocity,
-                                        velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
-                    
-                    end = time.time()
-                    avg_x_velocity = x_length/(end-start)                
-
-            #Pass The Middle Movement
-            else:
-                    avg_x_velocity = "PASSED"
-                    passed += 1
-                    axisy.move_relative(position=y_position, unit = Units.LENGTH_MILLIMETRES, 
-                        velocity=y_velocity, velocity_unit = Units.VELOCITY_MILLIMETRES_PER_SECOND)
-                
-            #Log the Task
-            log_tail = functions.logger(log_tail, count, energy, x_position, x_velocity, y_position, y_velocity, avg_x_velocity)
-            print("Task: {}/{}, {}".format(count, total_task, avg_x_velocity))
 
 if __name__ == "__main__":
     Library.enable_device_db_store()

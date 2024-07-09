@@ -57,5 +57,6 @@ def thread_switch(main_function, start_event, args, initial_functions, final_fun
 #Change image to binary matrix
 def img_2_mat(img_path):
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    th = cv2.adaptiveThreshold(img, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+    img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    ret,th = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
     return th 

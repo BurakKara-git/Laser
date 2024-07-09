@@ -1,19 +1,20 @@
 #RANGES(mm)
 X_MIN = 0.0
-X_MAX = 50.0
+X_MAX = 40.0
 Y_MIN = 1.0
-Y_MAX = 50.0
+Y_MAX = 60.0
 Z_MIN = 18.0
 Z_MAX = 24.0
 
 #VELOCITIES (mm/s)
 MIN_X_VEL = 1e-3
-MAX_X_VEL = 50.0
+MAX_X_VEL = 600.0
 MIN_Y_VEL = 1e-3
 MAX_Y_VEL = 600.0
 MIN_Z_VEL = 1e-3
 MAX_Z_VEL = 600.0
 Z_TEST_VELOCITY = 0.1
+MATRIX_VELOCITY = 50.0
 
 #PLACEHOLDERS
 INITIAL_X = 0.0
@@ -31,8 +32,8 @@ PROGRESS_BAR_LENGTH = 200
 #RUN.PY
 log_head = ["N","Energy(mJ)","X_Position(mm-Rel)", "X_Velocity(mm/s)", "Y_Position(mm-Rel)", "Y_Velocity(mm/s)",
             "Avg_X_Velocity(mm/s)", "Initial_X(mm)", "Initial_Y(mm)", "Initial_Z(mm)", "Initial_Rot(native)" ]
-IMAGE_PATH = "foto.jpeg"
-Z_TEST_STEP = 1
+IMAGE_PATH = "sag.png"
+Z_TEST_STEP = 0.01
 
 #TEST.PY
 TEST_ID= "ae28609e-18a4-4b28-8d89-30c567001c23"
