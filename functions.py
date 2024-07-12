@@ -64,10 +64,10 @@ def img_2_mat(img_path):
 #Run the task        
 def runner(window: classes.WindowController, 
            device: classes.Device,
-           button,
-           lock,
-           stop_event, 
-           resume_event
+           button: Button,
+           lock: threading.Lock,
+           stop_event: threading.Event, 
+           resume_event: threading.Event
     ):
     log_tail = []
     values = window.get_values()
@@ -208,10 +208,10 @@ def check_device(device: classes.Device,
 #Find Z-Axis Focus
 def z_test(window: classes.WindowController,
            device: classes.Device,
-           button,
-           lock,
-           stop_event, 
-           resume_event
+           button: Button,
+           lock: threading.Lock,
+           stop_event: threading.Event, 
+           resume_event: threading.Event
     ):
     initial_z = window.get_values()[2]
     lock.acquire()
@@ -254,21 +254,21 @@ def z_test(window: classes.WindowController,
 #Print Matrix
 def mat_print(device: classes.Device,
               window: classes.WindowController,
-              button,
-              mat, 
-              lock,
-              stop_event, 
-              resume_event
+              button: Button,
+              mat: list[list], 
+              lock: threading.Lock,
+              stop_event: threading. Event, 
+              resume_event: threading.Event
     ):
-    threshold = 255
-    initial_values = window.get_values()
-    initial_z = initial_values[2]
+    threshold = 0
+    initial_positions = window.get_values()
     rows = len(mat)
     cols = len(mat[0])
     print("Matrix Dimension: ", rows, cols)
-
-    y_step = constants.Y_MAX/rows
-    x_step = constants.X_MAX/cols
+    
+    x_step = (constants.X_MAX - initial_positions[0])/rows
+    y_step = (constants.Y_MAX - initial_positions[1])/cols
+    
     window.config_progress_text(0,rows*(cols-1))
 
     lock.acquire()
@@ -278,12 +278,37 @@ def mat_print(device: classes.Device,
                          unit=Units.LENGTH_MILLIMETRES)
     count = 0
     window.bar['value'] = 0
-    for row in range(rows):
-        x_pos = y_step*row
-        #move to x position
-        device.axisx.move_absolute(position=x_pos,
-                         unit=Units.LENGTH_MILLIMETRES)
-        for col in range(cols-1):
+    
+    def focus():
+        #Focus
+        try:
+            device.axisz.move_absolute(position=initial_positions[2],
+                    unit=Units.LENGTH_MILLIMETRES)
+        except MotionLibException as err:
+            print(err)
+            
+    def un_focus():
+        #Un-Focus
+        try:
+            device.axisz.move_absolute(position=constants.Z_MAX,
+                            unit=Units.LENGTH_MILLIMETRES)
+        except MotionLibException as err:
+            print(err)
+
+    for row in range(0, rows):
+        x_pos = x_step*row
+        new_y_step = 0
+
+        #move to positions
+        try:
+            device.axisx.move_relative(position=x_pos,
+                            unit=Units.LENGTH_MILLIMETRES)
+            device.axisy.move_absolute(position=initial_positions[1],
+                                unit= Units.LENGTH_MILLIMETRES)
+        except MotionLibException as err:
+            print(err)
+
+        for col in range(0, cols-1):
             window.bar['value'] = ((count+1)/(rows*(cols-1)))*100
             window.config_progress_text(count+1,rows*(cols-1))
             count += 1
@@ -293,32 +318,42 @@ def mat_print(device: classes.Device,
             
             #Return if Stop Button is Pressed
             if stop_event.is_set():
-                device.axisz.move_absolute(position=constants.Z_MAX,
-                                unit=Units.LENGTH_MILLIMETRES)
+                un_focus()
                 lock.release()
-                return               
-
-            y_pos = x_step*col
-            #move to y position
-            device.axisy.move_absolute(position=y_pos,
-                         unit=Units.LENGTH_MILLIMETRES)
-            if mat[row][col] == threshold:
-                #focus
-                device.axisz.move_absolute(position=initial_z,
-                         unit=Units.LENGTH_MILLIMETRES)
-                if mat[row][col+1] == threshold:
-                    next_y_pos = x_step*(col+1)
-                    #move to next y position
-                    device.axisy.move_absolute(position=next_y_pos,
-                         unit=Units.LENGTH_MILLIMETRES)
+                return
             
+            if mat[row][col] == threshold:
+                new_y_step += y_step
             else:
-                #unfocus
-                device.axisz.move_absolute(position=constants.Z_MAX,
-                         unit=Units.LENGTH_MILLIMETRES)
-        #unfocus
-        device.axisz.move_absolute(position=constants.Z_MAX,
-                         unit=Units.LENGTH_MILLIMETRES)
+                if new_y_step == 0:
+                    pass
+                else:
+                    focus()
+                    #Move Y-Axis
+                    try:
+                        device.axisy.move_relative(position=new_y_step,
+                                            unit=Units.LENGTH_MILLIMETRES,
+                                            velocity=constants.MATRIX_VELOCITY,
+                                            velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
+                    except MotionLibException as err:
+                        print(err)
+                        
+                    un_focus()            
+                    new_y_step = 0
+            
+        if new_y_step != 0:
+            focus()
+            #Move Y-Axis
+            try:
+                device.axisy.move_relative(position=new_y_step,
+                                    unit=Units.LENGTH_MILLIMETRES,
+                                    velocity=constants.MATRIX_VELOCITY,
+                                    velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND)
+            except MotionLibException as err:
+                print(err)
+            un_focus()                
+        un_focus()
+    un_focus()    
     lock.release()
     button.invoke()
     return
