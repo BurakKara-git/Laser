@@ -1,6 +1,6 @@
 from tkinter import Entry, Label, Tk, Button
 from tkinter.ttk import Progressbar, Combobox
-from zaber_motion import Units
+from zaber_motion import Units, MotionLibException
 from zaber_motion.ascii import Axis
 import constants
 
@@ -168,10 +168,81 @@ class Device:
         Returns:
             None
         """
-        self.axisx.stop()
-        self.axisy.stop()
-        self.axisz.stop()
-        self.axisrot.stop()
+        for axis in self.axes:
+            axis.stop()
+
+    def wait_axes(self):
+        """Waits all axis movements.
+
+        Waits the movement of the X, Y, Z axes, and the rotational axis.
+
+        Returns:
+            None
+        """
+        for axis in self.axes:
+            axis.wait_until_idle()
+
+    def move_try_except(
+        self,
+        axis: Axis,
+        type: str,
+        position: float,
+        unit,
+        wait_until_idle: bool = True,
+        velocity: float = 0,
+        velocity_unit=Units.NATIVE,
+        acceleration: float = 0,
+        acceleration_unit=Units.NATIVE,
+    ):
+        """
+        Safely attempts to move an axis with specified parameters, handling any
+        MotionLibException that may occur.
+
+        Args:
+        - axis (Axis): The axis to move.
+        - type (str): The type of movement, such as 'move_absolute' or 'move_relative'.
+        - position (float): The target position for the movement.
+        - unit: The unit of measurement for the position.
+        - wait_until_idle (bool, optional): Whether to wait until the axis is idle after the move. Default is True.
+        - velocity (float, optional): The velocity for the movement. Default is 0.
+        - velocity_unit (optional): The unit of measurement for the velocity. Default is Units.NATIVE.
+        - acceleration (float, optional): The acceleration for the movement. Default is 0.
+        - acceleration_unit (optional): The unit of measurement for the acceleration. Default is Units.NATIVE.
+
+        Returns:
+        - None
+
+        This method tries to perform a movement operation on the given axis using the specified parameters.
+        If a MotionLibException is encountered, the exception is caught, and the error message is printed.
+
+        Example usage:
+        ```python
+        move_try_except(
+            axis=my_axis,
+            type='move_absolute',
+            position=10.0,
+            unit=Units.LENGTH_MILLIMETRES,
+            velocity=5.0,
+            velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND,
+            acceleration=2.0,
+            acceleration_unit=Units.ACCELERATION_MILLIMETRES_PER_SECOND_SQUARED
+        )
+        ```
+        """
+        try:
+            movement = getattr(axis, type)
+            movement(
+                position=position,
+                unit=unit,
+                wait_until_idle=wait_until_idle,
+                velocity=velocity,
+                velocity_unit=velocity_unit,
+                acceleration=acceleration,
+                acceleration_unit=acceleration_unit,
+            )
+
+        except MotionLibException as err:
+            print(err)
 
 
 class WindowController:
@@ -381,7 +452,7 @@ class WindowController:
                 widget.destroy()
 
         # Print Set Messages
-        for i in range(len(values)-1):
+        for i in range(len(values) - 1):
             text = Label(self.window, font=("Arial Bold", 20), fg="green")
             text.configure(text=values[i])
             text.grid(column=2, row=i + 1)

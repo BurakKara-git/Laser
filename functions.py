@@ -1,10 +1,5 @@
 from tkinter import *
-from zaber_motion import Units, MotionLibException, Measurement
-from zaber_motion.gcode import (
-    Translator,
-    TranslatorConfig,
-    AxisTransformation,
-)
+from zaber_motion import Units, MotionLibException
 from zaber_motion.ascii import (
     WarningFlags,
     Device,
@@ -12,6 +7,8 @@ from zaber_motion.ascii import (
 import time, threading, constants, classes, functions
 import os, datetime, csv, cv2
 from typing import List
+from gcodeparser import GcodeParser
+import math
 
 
 # Logger
@@ -551,37 +548,122 @@ def mat_print(
 
 # GCode(In Dev)
 def GCode(device_list: List[Device]):
-    print("Found {} devices".format(len(device_list)))
-
     """
-    streamx = device_list[0].streams.get_stream(1)
-    streamy = device_list[1].streams.get_stream(1)
-    streamz = device_list[2].streams.get_stream(1)
-    streamrot = device_list[3].streams.get_stream(1)
+    Execute G-code instructions on a list of devices. Currently does not distinguish G-Code Command (e.g. G01 or G00).
+    The function will be further developed for more advanced tasks.
 
-    streamx.setup_live(1)
-    streamy.setup_live(2)
-    streamz.setup_live(3)
-    streamrot.setup_live(4)
+    Args:
+    - device_list (List[Device]): List of devices to control, where each device corresponds to an axis of motion.
+
+    Returns:
+    - None
+
+    This function reads G-code instructions from a file named "gcode.txt" and executes the specified movements
+    on the provided devices. Each device in the list is assumed to control one axis (X, Y, Z, or R for rotation).
+
+    Process:
+    1. Reads G-code from a file.
+    2. Parses the G-code into lines with movement commands.
+    3. For each line, extracts the parameters for X, Y, Z, and R axes as well as the feed rate (F).
+    4. Calculates the average speed for the axes to be moved.
+    5. Executes the movement commands for each axis.
+
+    Example G-code line:
+    ```
+    G1 X10 Y20 Z5 F1500
+    ```
+
+    Example usage:
+    ```python
+    device_list = [device_x, device_y, device_z, device_rot]
+    GCode(device_list)
+    ```
+
+    Note:
+    - The function assumes that each device in `device_list` has a method `get_axis` to get the corresponding axis.
     """
 
-    axis_list = ["X", "Y", "Z", "A"]
-    for i in range(len(device_list) - 1):
-        stream = device_list[i].streams.get_stream(1)
-        stream.setup_live(1, 2)
-        axis_transformations = [
-            AxisTransformation(
-                axis_list[i], translation=Measurement(0, Units.LENGTH_MILLIMETRES)
+    print("Found {} devices".format(device_list))
+
+    axes_list = [device.get_axis(1) for device in device_list]
+    device = classes.Device(*axes_list)
+
+    try:
+        with open("gcode.txt", "r") as f:
+            gcode = f.read()
+    except IOError:
+        print("Error on 'GCode' Function")
+        return
+
+    lines = GcodeParser(gcode).lines
+    for line in lines:
+        print(line.comment)
+
+        axis_params = {
+            "X": line.get_param("X"),
+            "Y": line.get_param("Y"),
+            "Z": line.get_param("Z"),
+            "R": line.get_param("R"),
+        }
+
+        speed = line.get_param("F") or 0
+        axis_count = sum(1 for param in axis_params.values() if param is not None)
+
+        if axis_count > 0:
+            speed /= axis_count
+
+        if axis_params["R"] is not None and speed != 0:
+            positions = device.get_current_positions()
+            radius = math.sqrt(
+                (constants.X_CENTER - positions[0]) ** 2
+                + (constants.Y_CENTER - positions[1]) ** 2
+            )
+            rot_speed = speed / radius if radius != 0 else 0
+            rot_speed = min(rot_speed, constants.MAX_ROT_VEL)
+        else:
+            rot_speed = 0
+
+        move_commands = {
+            "X": (
+                "axisx",
+                "move_absolute",
+                Units.LENGTH_MILLIMETRES,
+                Units.VELOCITY_MILLIMETRES_PER_SECOND,
             ),
-        ]
-        print(axis_transformations[0].axis_letter)
-        translator = Translator.setup(
-            stream,
-            TranslatorConfig(
-                axis_transformations=axis_transformations,
+            "Y": (
+                "axisy",
+                "move_absolute",
+                Units.LENGTH_MILLIMETRES,
+                Units.VELOCITY_MILLIMETRES_PER_SECOND,
             ),
-        )
-        translator.translate_async("G0 X20 Y20 Z20")
+            "Z": (
+                "axisz",
+                "move_absolute",
+                Units.LENGTH_MILLIMETRES,
+                Units.VELOCITY_MILLIMETRES_PER_SECOND,
+            ),
+            "R": (
+                "axisrot",
+                "move_relative",
+                Units.ANGLE_RADIANS,
+                Units.ANGULAR_VELOCITY_RADIANS_PER_SECOND,
+            ),
+        }
+
+        for axis, (axis_attr, move_type, unit, velocity_unit) in move_commands.items():
+            param = axis_params[axis]
+            if param is not None:
+                velocity = rot_speed if axis == "R" else speed
+                device.move_try_except(
+                    axis=getattr(device, axis_attr),
+                    type=move_type,
+                    position=param,
+                    velocity=velocity,
+                    unit=unit,
+                    velocity_unit=velocity_unit,
+                    wait_until_idle=False,
+                )
+        device.wait_axes()
 
 
 # Main Program
@@ -611,23 +693,16 @@ def stage_controller(device_list):
     Additionally, the function includes a device health check thread to monitor and
     display warnings related to critical system errors or hardware emergency stops.
     """
-    print("Found {} devices".format(len(device_list)))
-    devicex = device_list[0]
-    devicey = device_list[1]
-    devicez = device_list[2]
-    devicerot = device_list[3]
-    axisx = devicex.get_axis(1)
-    axisy = devicey.get_axis(1)
-    axisz = devicez.get_axis(1)
-    axisrot = devicerot.get_axis(1)
-    device = classes.Device(axisx, axisy, axisz, axisrot)
+    print(f"Found {len(device_list)} devices")
+
+    # Initialize devices and axes
+    axes_list = [device.get_axis(1) for device in device_list]
+    device = classes.Device(*axes_list)
 
     # Initialize Thread Events
     start_event = threading.Event()
     start_event.set()
-
     pause_event = threading.Event()
-
     lock = threading.Lock()
 
     # Configure Main Window
@@ -636,13 +711,19 @@ def stage_controller(device_list):
 
     # Check Device Health
     check_device_thread = threading.Thread(
-        target=functions.check_device(device, window_controller)
+        target=functions.check_device, args=(device, window_controller)
     )
     check_device_thread.daemon = True
     check_device_thread.start()
 
-    # Z-Test Button
-    z_test_initial_functions = [
+    # Utility function to create button and set grid position
+    def create_button(text, command, column, row):
+        btn = Button(window, text=text, command=command)
+        btn.grid(column=column, row=row)
+        return btn
+
+    # Z-Test Button Configuration
+    z_test_initial_funcs = [
         lambda: extract_btn.config(state=DISABLED),
         lambda: window_controller.set_btn.config(state=DISABLED),
         lambda: run_btn.config(state=DISABLED),
@@ -652,7 +733,7 @@ def stage_controller(device_list):
         lambda: z_test_btn.config(text="Stop Z-Test"),
     ]
 
-    z_test_final_functions = [
+    z_test_final_funcs = [
         lambda: extract_btn.config(state=NORMAL),
         lambda: window_controller.set_btn.config(state=NORMAL),
         lambda: run_btn.config(state=NORMAL),
@@ -665,16 +746,14 @@ def stage_controller(device_list):
         functions.z_test,
         start_event,
         (window_controller, device, z_test_btn, lock, start_event, pause_event),
-        z_test_initial_functions,
-        z_test_final_functions,
+        z_test_initial_funcs,
+        z_test_final_funcs,
     )
 
-    z_test_btn = Button(window, text="Start Z-Test", command=z_test_command)
+    z_test_btn = create_button("Start Z-Test", z_test_command, 4, 3)
 
-    z_test_btn.grid(column=4, row=3)
-
-    # Run Button
-    runner_initial_functions = [
+    # Run Button Configuration
+    run_initial_funcs = [
         lambda: extract_btn.config(state=DISABLED),
         lambda: window_controller.set_btn.config(state=DISABLED),
         lambda: z_test_btn.config(state=DISABLED),
@@ -686,7 +765,7 @@ def stage_controller(device_list):
         lambda: run_btn.config(text="STOP"),
     ]
 
-    runner_final_functions = [
+    run_final_funcs = [
         lambda: device.extract_axes(),
         lambda: extract_btn.config(state=NORMAL),
         lambda: window_controller.set_btn.config(state=NORMAL),
@@ -699,37 +778,36 @@ def stage_controller(device_list):
         lambda: run_btn.config(text="RUN"),
     ]
 
-    runner_command = lambda: functions.thread_switch(
+    run_command = lambda: functions.thread_switch(
         functions.runner,
         start_event,
         (window_controller, device, run_btn, lock, start_event, pause_event),
-        runner_initial_functions,
-        runner_final_functions,
+        run_initial_funcs,
+        run_final_funcs,
     )
 
-    run_btn = Button(window, text="RUN", command=runner_command)
-    run_btn.grid(column=1, row=10)
+    run_btn = create_button("RUN", run_command, 1, 10)
 
-    # Pause Button
-    pause_initial_functions = [
+    # Pause Button Configuration
+    pause_initial_funcs = [
         lambda: window_controller.print_msg("PAUSED THE TASK", "red"),
         lambda: pause_btn.config(text="RESUME"),
     ]
 
-    pause_final_functions = [
+    pause_final_funcs = [
         lambda: window_controller.print_msg("RESUMED THE TASK", "green"),
         lambda: pause_btn.config(text="PAUSE"),
     ]
 
     pause_command = lambda: functions.thread_switch(
-        None, pause_event, None, pause_initial_functions, pause_final_functions
+        None, pause_event, None, pause_initial_funcs, pause_final_funcs
     )
-    pause_btn = Button(window, text="PAUSE", command=pause_command)  # Requested by Sena
-    pause_btn.grid(column=0, row=10)
 
-    # Matrix Print Button
+    pause_btn = create_button("PAUSE", pause_command, 0, 10)
+
+    # Matrix Print Button Configuration
     mat = functions.img_2_mat(constants.IMAGE_PATH)
-    mat_print_initial_functions = [
+    mat_print_initial_funcs = [
         lambda: extract_btn.config(state=DISABLED),
         lambda: window_controller.set_btn.config(state=DISABLED),
         lambda: z_test_btn.config(state=DISABLED),
@@ -740,7 +818,7 @@ def stage_controller(device_list):
         lambda: mat_print_btn.config(text="Stop Matrix Print"),
     ]
 
-    mat_print_final_functions = [
+    mat_print_final_funcs = [
         lambda: device.extract_axes(),
         lambda: extract_btn.config(state=NORMAL),
         lambda: window_controller.set_btn.config(state=NORMAL),
@@ -756,16 +834,15 @@ def stage_controller(device_list):
         functions.mat_print,
         start_event,
         (device, window_controller, mat_print_btn, mat, lock, start_event, pause_event),
-        mat_print_initial_functions,
-        mat_print_final_functions,
+        mat_print_initial_funcs,
+        mat_print_final_funcs,
     )
 
-    mat_print_btn = Button(
-        window, text="Start Matrix Print (IN DEVELOPMENT)", command=mat_print_command
+    mat_print_btn = create_button(
+        "Start Matrix Print (IN DEVELOPMENT)", mat_print_command, 4, 10
     )
-    mat_print_btn.grid(column=4, row=10)
 
-    # Extract Button
-    extract_btn = Button(window, text="EXTRACT", command=lambda: device.extract_axes())
-    extract_btn.grid(column=5, row=10)
+    # Extract Button Configuration
+    extract_btn = create_button("EXTRACT", lambda: device.extract_axes(), 5, 10)
+
     window.mainloop()
