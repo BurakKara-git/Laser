@@ -1,4 +1,4 @@
-from tkinter import Entry, Label, Tk, Button
+from tkinter import Entry, Label, Tk, Button, Text
 from tkinter.ttk import Progressbar, Combobox
 from zaber_motion import Units, MotionLibException
 from zaber_motion.ascii import Axis
@@ -312,6 +312,12 @@ class WindowController:
         self.set_degree["values"] = constants.DEGREES
         self.set_degree.current(0)
         self.set_degree.grid(column=1, row=9)
+
+        self.gcode_label = Label(window, text="GCode Input", font=("Arial Bold", 20))
+        self.gcode_text = Text(window, height=5, width=52)
+        self.gcode_label.grid(column=6, row=0)
+        self.gcode_text.grid(column=6, row=1)
+        self.gcode_text.insert("end", constants.GCODE_PLACEHOLDER)
 
         self.set_degree_text = Label(
             self.window, text="Degree", font=("Arial Bold", 20)

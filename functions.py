@@ -547,58 +547,74 @@ def mat_print(
 
 
 # GCode(In Dev)
-def GCode(device_list: List[Device]):
+def GCode(
+    gcode: str,
+    device: classes.Device,
+    window: classes.WindowController,
+    button: Button,
+    lock: threading.Lock,
+    stop_event: threading.Event,
+    resume_event: threading.Event,
+):
     """
-    Execute G-code instructions on a list of devices. Currently does not distinguish G-Code Command (e.g. G01 or G00).
-    The function will be further developed for more advanced tasks.
+    Execute G-code instructions to control the motion of a device.
 
     Args:
-    - device_list (List[Device]): List of devices to control, where each device corresponds to an axis of motion.
+    - gcode (str): The G-code instructions to execute.
+    - device (classes.Device): The device to control, containing multiple axes.
+    - window (classes.WindowController): The window controller to update UI elements.
+    - button (Button): The button to invoke when execution is complete.
+    - lock (threading.Lock): A threading lock to synchronize access.
+    - stop_event (threading.Event): An event to signal stopping the execution.
+    - resume_event (threading.Event): An event to signal resuming the execution.
 
     Returns:
     - None
 
-    This function reads G-code instructions from a file named "gcode.txt" and executes the specified movements
-    on the provided devices. Each device in the list is assumed to control one axis (X, Y, Z, or R for rotation).
+    This function reads and parses G-code instructions, then executes the specified movements
+    on the provided device. It updates the UI to reflect progress and handles stopping and resuming
+    based on the provided events.
 
     Process:
-    1. Reads G-code from a file.
-    2. Parses the G-code into lines with movement commands.
-    3. For each line, extracts the parameters for X, Y, Z, and R axes as well as the feed rate (F).
-    4. Calculates the average speed for the axes to be moved.
-    5. Executes the movement commands for each axis.
-
-    Example G-code line:
-    ```
-    G1 X10 Y20 Z5 F1500
-    ```
+    1. Parses the G-code into individual lines with movement commands.
+    2. Iterates through each G-code line, calculating the required parameters for each axis.
+    3. Adjusts the speed for each axis based on the provided feed rate.
+    4. Calculates rotational speed if applicable.
+    5. Executes the move commands for each axis.
+    6. Updates the UI progress bar and text.
+    7. Handles pausing and stopping the execution based on events.
 
     Example usage:
     ```python
-    device_list = [device_x, device_y, device_z, device_rot]
-    GCode(device_list)
+    gcode = "G1 X10 Y20 Z5 F1500"
+    GCode(gcode, device, window_controller, button, lock, stop_event, resume_event)
     ```
 
     Note:
-    - The function assumes that each device in `device_list` has a method `get_axis` to get the corresponding axis.
+    - The function assumes that `device` has methods `move_try_except` and `wait_axes`.
+    - The `window` object should have methods `config_progress_text` and a `bar` attribute to update progress.
+    - Error handling for file reading and movement execution is implemented.
     """
-
-    print("Found {} devices".format(device_list))
-
-    axes_list = [device.get_axis(1) for device in device_list]
-    device = classes.Device(*axes_list)
-
-    try:
-        with open("gcode.txt", "r") as f:
-            gcode = f.read()
-    except IOError:
-        print("Error on 'GCode' Function")
-        return
-
+    # Parse G-code lines
     lines = GcodeParser(gcode).lines
+    count = 0
+    total_count = len(lines)
+    lock.acquire()
     for line in lines:
-        print(line.comment)
+        while not resume_event.is_set():
+            time.sleep(1)
 
+        # Return if Stop Button is Pressed
+        if stop_event.is_set():
+            lock.release()
+            device.stop_axes()
+            return
+        count += 1
+        window.bar["value"] = ((count) / total_count) * 100
+        window.config_progress_text(count, total_count)
+        speed = line.get_param("F") or 0
+
+        # Get axis parameters
         axis_params = {
             "X": line.get_param("X"),
             "Y": line.get_param("Y"),
@@ -606,12 +622,20 @@ def GCode(device_list: List[Device]):
             "R": line.get_param("R"),
         }
 
-        speed = line.get_param("F") or 0
-        axis_count = sum(1 for param in axis_params.values() if param is not None)
+        # Calculate total length for speed distribution
+        total_len = math.sqrt(
+            sum(
+                (param or 0) ** 2 for param in axis_params.values() if param is not None
+            )
+        )
 
-        if axis_count > 0:
-            speed /= axis_count
+        # Calculate axis speeds
+        axis_speeds = {
+            axis: (param * speed / total_len if param is not None else 0)
+            for axis, param in axis_params.items()
+        }
 
+        # Calculate rotational speed
         if axis_params["R"] is not None and speed != 0:
             positions = device.get_current_positions()
             radius = math.sqrt(
@@ -622,7 +646,9 @@ def GCode(device_list: List[Device]):
             rot_speed = min(rot_speed, constants.MAX_ROT_VEL)
         else:
             rot_speed = 0
+        axis_speeds["R"] = rot_speed
 
+        # Move commands dictionary
         move_commands = {
             "X": (
                 "axisx",
@@ -650,6 +676,7 @@ def GCode(device_list: List[Device]):
             ),
         }
 
+        # Execute commands
         for axis, (axis_attr, move_type, unit, velocity_unit) in move_commands.items():
             param = axis_params[axis]
             if param is not None:
@@ -665,8 +692,12 @@ def GCode(device_list: List[Device]):
                 )
         device.wait_axes()
 
+    lock.release()
+    button.invoke()
+    return
 
-# Main Program
+
+# GUI
 def stage_controller(device_list):
     """
     Sets up and controls a stage controller application with GUI using Tkinter,
@@ -689,6 +720,7 @@ def stage_controller(device_list):
     - RUN/STOP: Initiates or stops a task running function that moves the X and Y axes.
     - PAUSE/RESUME: Pauses or resumes the current task execution.
     - Matrix Print: Prints a matrix pattern on a surface based on an image file.
+    - GCode: Inititates the given GCode commands (In Dev)
 
     Additionally, the function includes a device health check thread to monitor and
     display warnings related to critical system errors or hardware emergency stops.
@@ -758,6 +790,7 @@ def stage_controller(device_list):
         lambda: window_controller.set_btn.config(state=DISABLED),
         lambda: z_test_btn.config(state=DISABLED),
         lambda: mat_print_btn.config(state=DISABLED),
+        lambda: gcode_btn.config(state=DISABLED),
         lambda: pause_event.set(),
         lambda: window_controller.setter(device),
         lambda: window_controller.print_msg("RUNNING THE TASK", "green"),
@@ -771,6 +804,7 @@ def stage_controller(device_list):
         lambda: window_controller.set_btn.config(state=NORMAL),
         lambda: z_test_btn.config(state=NORMAL),
         lambda: mat_print_btn.config(state=NORMAL),
+        lambda: gcode_btn.config(state=NORMAL),
         lambda: pause_event.clear(),
         lambda: pause_btn.config(text="PAUSE"),
         lambda: window_controller.print_msg("STOPPED THE TASK", "red"),
@@ -812,6 +846,7 @@ def stage_controller(device_list):
         lambda: window_controller.set_btn.config(state=DISABLED),
         lambda: z_test_btn.config(state=DISABLED),
         lambda: run_btn.config(state=DISABLED),
+        lambda: gcode_btn.config(state=DISABLED),
         lambda: window_controller.setter(device),
         lambda: pause_event.set(),
         lambda: window_controller.print_msg("PRINTING MATRIX", "green"),
@@ -824,6 +859,7 @@ def stage_controller(device_list):
         lambda: window_controller.set_btn.config(state=NORMAL),
         lambda: z_test_btn.config(state=NORMAL),
         lambda: run_btn.config(state=NORMAL),
+        lambda: gcode_btn.config(state=NORMAL),
         lambda: pause_event.clear(),
         lambda: pause_btn.config(text="PAUSE"),
         lambda: window_controller.print_msg("STOPPED MATRIX", "red"),
@@ -844,5 +880,48 @@ def stage_controller(device_list):
 
     # Extract Button Configuration
     extract_btn = create_button("EXTRACT", lambda: device.extract_axes(), 5, 10)
+
+    # GCode Button Configuration
+    gcode_initial_funcs = [
+        lambda: extract_btn.config(state=DISABLED),
+        lambda: window_controller.set_btn.config(state=DISABLED),
+        lambda: z_test_btn.config(state=DISABLED),
+        lambda: run_btn.config(state=DISABLED),
+        lambda: mat_print_btn.config(state=DISABLED),
+        lambda: pause_event.set(),
+        lambda: window_controller.print_msg("STARTED GCode", "green"),
+        lambda: gcode_btn.config(text="STOP GCODE"),
+    ]
+
+    gcode_final_funcs = [
+        lambda: device.extract_axes(),
+        lambda: extract_btn.config(state=NORMAL),
+        lambda: window_controller.set_btn.config(state=NORMAL),
+        lambda: z_test_btn.config(state=NORMAL),
+        lambda: run_btn.config(state=NORMAL),
+        lambda: mat_print_btn.config(state=NORMAL),
+        lambda: pause_event.clear(),
+        lambda: pause_btn.config(text="PAUSE"),
+        lambda: window_controller.print_msg("STOPPED GCode", "red"),
+        lambda: gcode_btn.config(text="Start GCode"),
+    ]
+
+    gcode_command = lambda: functions.thread_switch(
+        functions.GCode,
+        start_event,
+        (
+            window_controller.gcode_text.get("1.0", END),
+            device,
+            window_controller,
+            gcode_btn,
+            lock,
+            start_event,
+            pause_event,
+        ),
+        gcode_initial_funcs,
+        gcode_final_funcs,
+    )
+
+    gcode_btn = create_button("Start GCode", gcode_command, 6, 3)
 
     window.mainloop()
