@@ -244,6 +244,71 @@ class Device:
         except MotionLibException as err:
             print(err)
 
+    def focus(self):
+        """
+        Moves the Z-axis to the initial focus position.
+
+        This method calls the `move_try_except` function to move the Z-axis of the device
+        to the predefined initial focus position specified by `constants.INITIAL_Z`.
+
+        Parameters:
+        None
+
+        Usage:
+        Call this method to set the Z-axis to the initial focus position, typically used
+        for setting up the initial focus before starting other movements or operations.
+
+        Example:
+        ```python
+        device.focus()
+        ```
+
+        Notes:
+        - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
+        - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
+        - The `position` parameter is set to `constants.INITIAL_Z`, specifying the target position.
+        - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
+
+        """
+        self.move_try_except(
+            axis=self.axisz,
+            type="move_absolute",
+            position=constants.INITIAL_Z,
+            unit=Units.LENGTH_MILLIMETRES,
+        )
+
+    def un_focus(self):
+        """
+        Moves the Z-axis to the maximum Z position.
+
+        This method calls the `move_try_except` function to move the Z-axis of the device
+        to the predefined maximum Z position specified by `constants.Z_MAX`.
+
+        Parameters:
+        None
+
+        Usage:
+        Call this method to set the Z-axis to the maximum Z position, typically used
+        for retracting the device to a safe position before starting or ending other operations.
+
+        Example:
+        ```python
+        device.un_focus()
+        ```
+
+        Notes:
+        - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
+        - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
+        - The `position` parameter is set to `constants.Z_MAX`, specifying the target position.
+        - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
+        """
+        self.move_try_except(
+            axis=self.axisz,
+            type="move_absolute",
+            position=constants.Z_MAX,
+            unit=Units.LENGTH_MILLIMETRES,
+        )
+
 
 class WindowController:
     """

@@ -1,9 +1,7 @@
 from tkinter import *
 from zaber_motion import Units, MotionLibException
-from zaber_motion.ascii import (
-    WarningFlags,
-    Device,
-)
+from zaber_motion.ascii import WarningFlags, Device
+from zaber_motion.gcode import Translator
 import time, threading, constants, classes, functions
 import os, datetime, csv, cv2
 from typing import List
@@ -549,7 +547,7 @@ def mat_print(
 # GCode(In Dev)
 def GCode(
     gcode: str,
-    device: classes.Device,
+    device_list: List[Device],
     window: classes.WindowController,
     button: Button,
     lock: threading.Lock,
@@ -557,140 +555,183 @@ def GCode(
     resume_event: threading.Event,
 ):
     """
-    Execute G-code instructions to control the motion of a device.
+    Executes G-code commands on a list of devices, controlling their movements
+    based on the parsed G-code instructions.
 
-    Args:
-    - gcode (str): The G-code instructions to execute.
-    - device (classes.Device): The device to control, containing multiple axes.
-    - window (classes.WindowController): The window controller to update UI elements.
-    - button (Button): The button to invoke when execution is complete.
-    - lock (threading.Lock): A threading lock to synchronize access.
-    - stop_event (threading.Event): An event to signal stopping the execution.
-    - resume_event (threading.Event): An event to signal resuming the execution.
+    Parameters:
+    - gcode (str): The G-code string containing the movement commands.
+    - device_list (List[Device]): List of Device objects representing the axes to be controlled.
+    - window (classes.WindowController): The window controller for updating UI elements.
+    - button (Button): Button to invoke upon completion or error.
+    - lock (threading.Lock): Thread lock to control access to shared resources.
+    - stop_event (threading.Event): Event to signal stopping the execution.
+    - resume_event (threading.Event): Event to signal resuming the execution.
 
-    Returns:
-    - None
+    This function performs the following steps:
+    1. Parses the G-code lines.
+    2. Sets up the device streams and translators.
+    3. Iterates over the parsed G-code lines, controlling the devices accordingly.
+    4. Updates the progress bar and text in the UI.
+    5. Handles threading for concurrent execution of commands.
+    6. Waits for threads to complete and then flushes translators and disables streams.
+    7. Releases the lock and invokes the button upon completion or if an error occurs.
 
-    This function reads and parses G-code instructions, then executes the specified movements
-    on the provided device. It updates the UI to reflect progress and handles stopping and resuming
-    based on the provided events.
-
-    Process:
-    1. Parses the G-code into individual lines with movement commands.
-    2. Iterates through each G-code line, calculating the required parameters for each axis.
-    3. Adjusts the speed for each axis based on the provided feed rate.
-    4. Calculates rotational speed if applicable.
-    5. Executes the move commands for each axis.
-    6. Updates the UI progress bar and text.
-    7. Handles pausing and stopping the execution based on events.
+    Internal helper functions:
+    - axis_stream(translator: Translator, command: str): Sends a command to a specific translator.
+    - calculate_speeds(axis_params, previous_positions, speed): Calculates the speeds for each axis based on the parameters.
+    - setup_devices(): Sets up the device streams and translators.
 
     Example usage:
     ```python
-    gcode = "G1 X10 Y20 Z5 F1500"
-    GCode(gcode, device, window_controller, button, lock, stop_event, resume_event)
+    GCode(gcode_str, device_list, window_controller, button, lock, stop_event, resume_event)
     ```
 
     Note:
-    - The function assumes that `device` has methods `move_try_except` and `wait_axes`.
-    - The `window` object should have methods `config_progress_text` and a `bar` attribute to update progress.
-    - Error handling for file reading and movement execution is implemented.
+    - The function prints and updates the UI in case of errors.
     """
-    # Parse G-code lines
-    lines = GcodeParser(gcode).lines
-    count = 0
-    total_count = len(lines)
-    lock.acquire()
-    for line in lines:
-        while not resume_event.is_set():
-            time.sleep(1)
 
-        # Return if Stop Button is Pressed
-        if stop_event.is_set():
-            lock.release()
-            device.stop_axes()
-            return
-        count += 1
-        window.bar["value"] = ((count) / total_count) * 100
-        window.config_progress_text(count, total_count)
-        speed = line.get_param("F") or 0
+    def axis_stream(translator: Translator, command: str):
+        print(f"Command: {command}, Translator: {translator}")
+        try:
+            translator.translate(command)
+            translator.flush()
+        except MotionLibException as err:
+            window.print_msg("Wrong Command", "red")
+            print(f"Wrong Command: {command}.")
+            print(err)
 
-        # Get axis parameters
-        axis_params = {
-            "X": line.get_param("X"),
-            "Y": line.get_param("Y"),
-            "Z": line.get_param("Z"),
-            "R": line.get_param("R"),
-        }
+    def calculate_speeds(axis_params, previous_positions, speed):
+        check = ["X", "Y", "Z"]
+        position_differences = [0, 0, 0]
+        pre_sum = 0
+        axis_speeds = {axis: 0 for axis in axis_params}
 
-        # Calculate total length for speed distribution
-        total_len = math.sqrt(
-            sum(
-                (param or 0) ** 2 for param in axis_params.values() if param is not None
-            )
-        )
+        for i in range(3):
+            param, _ = axis_params[check[i]]
+            if param is not None:
+                dif = abs(previous_positions[i] - param)
+                position_differences[i] = dif
+                pre_sum += dif**2
 
-        # Calculate axis speeds
-        axis_speeds = {
-            axis: (param * speed / total_len if param is not None else 0)
-            for axis, param in axis_params.items()
-        }
+        total_len = math.sqrt(pre_sum)
 
-        # Calculate rotational speed
-        if axis_params["R"] is not None and speed != 0:
-            positions = device.get_current_positions()
+        for i in range(3):
+            param, _ = axis_params[check[i]]
+            if param is not None:
+                axis_speeds[check[i]] = (
+                    (position_differences[i] * speed / total_len)
+                    if total_len != 0
+                    else 0
+                )
+
+        param_a, _ = axis_params["A"]
+        if param_a is not None and speed != 0:
             radius = math.sqrt(
-                (constants.X_CENTER - positions[0]) ** 2
-                + (constants.Y_CENTER - positions[1]) ** 2
+                (constants.X_CENTER - previous_positions[0]) ** 2
+                + (constants.Y_CENTER - previous_positions[1]) ** 2
             )
             rot_speed = speed / radius if radius != 0 else 0
             rot_speed = min(rot_speed, constants.MAX_ROT_VEL)
         else:
             rot_speed = 0
-        axis_speeds["R"] = rot_speed
+        axis_speeds["A"] = rot_speed
 
-        # Move commands dictionary
-        move_commands = {
-            "X": (
-                "axisx",
-                "move_absolute",
-                Units.LENGTH_MILLIMETRES,
-                Units.VELOCITY_MILLIMETRES_PER_SECOND,
-            ),
-            "Y": (
-                "axisy",
-                "move_absolute",
-                Units.LENGTH_MILLIMETRES,
-                Units.VELOCITY_MILLIMETRES_PER_SECOND,
-            ),
-            "Z": (
-                "axisz",
-                "move_absolute",
-                Units.LENGTH_MILLIMETRES,
-                Units.VELOCITY_MILLIMETRES_PER_SECOND,
-            ),
-            "R": (
-                "axisrot",
-                "move_relative",
-                Units.ANGLE_RADIANS,
-                Units.ANGULAR_VELOCITY_RADIANS_PER_SECOND,
-            ),
+        return axis_speeds
+
+    def setup_devices():
+        try:
+            axis_list = [device.get_axis(1) for device in device_list]
+            stream_list = [device.streams.get_stream(1) for device in device_list]
+            for stream in stream_list:
+                stream.setup_live(1)
+            translator_list = [Translator.setup(stream) for stream in stream_list]
+            return axis_list, stream_list, translator_list
+        except MotionLibException as err:
+            print(err)
+            window.print_msg("ERROR - TASK IS ABORTED!", "red")
+            lock.release()
+            button.invoke()
+            return None, None, None
+
+    axis_list, stream_list, translator_list = setup_devices()
+    lock.acquire()
+    lines = GcodeParser(gcode).lines
+    total_count = len(lines)
+    all_devices = classes.Device(*axis_list)
+    threads = []
+
+    count = 0
+    while not stop_event.is_set():
+        while not resume_event.is_set():
+            time.sleep(1)
+            if stop_event.is_set():
+                break
+
+        if count == total_count:
+            break
+
+        line = lines[count]
+        count += 1
+        window.bar["value"] = (count / total_count) * 100
+        window.config_progress_text(count, total_count)
+
+        axis_params = {
+            "X": (line.get_param("X"), translator_list[0]),
+            "Y": (line.get_param("Y"), translator_list[1]),
+            "Z": (line.get_param("Z"), translator_list[2]),
+            "A": (line.get_param("A"), translator_list[3]),
         }
+        print(line.comment)
+        speed = (line.get_param("F") or 0) * 60
 
-        # Execute commands
-        for axis, (axis_attr, move_type, unit, velocity_unit) in move_commands.items():
-            param = axis_params[axis]
-            if param is not None:
-                velocity = rot_speed if axis == "R" else speed
-                device.move_try_except(
-                    axis=getattr(device, axis_attr),
-                    type=move_type,
-                    position=param,
-                    velocity=velocity,
-                    unit=unit,
-                    velocity_unit=velocity_unit,
-                    wait_until_idle=False,
+        previous_positions = all_devices.get_current_positions()
+        axis_speeds = calculate_speeds(axis_params, previous_positions, speed)
+
+        if all(param is None for param, _ in axis_params.values()):
+            command = line.command_str
+            if command in {"M3", "M4"}:
+                command = f"G0 X{constants.Z_MAX}"
+                thread = threading.Thread(
+                    target=axis_stream, args=(translator_list[2], command)
                 )
-        device.wait_axes()
+                threads.append(thread)
+                thread.start()
+            elif command == "M5":
+                command = f"G0 X{constants.INITIAL_Z}"
+                thread = threading.Thread(
+                    target=axis_stream, args=(translator_list[2], command)
+                )
+                threads.append(thread)
+                thread.start()
+            else:
+                for i in range(4):
+                    thread = threading.Thread(
+                        target=axis_stream, args=(translator_list[i], command)
+                    )
+                    threads.append(thread)
+                    thread.start()
+        else:
+            non_none_params = {
+                axis: (param, translator)
+                for axis, (param, translator) in axis_params.items()
+                if param is not None
+            }
+            for axis, (param, translator) in non_none_params.items():
+                command = f"{line.command_str} X{param}"
+                if line.get_param("F") is not None:
+                    command += f" F{axis_speeds[axis]}"
+                thread = threading.Thread(
+                    target=axis_stream, args=(translator, command)
+                )
+                threads.append(thread)
+                thread.start()
+
+        for thread in threads:
+            thread.join()
+            print("Sub-Thread is Joined")
+
+    for stream in stream_list:
+        stream.disable()
 
     lock.release()
     button.invoke()
@@ -894,7 +935,6 @@ def stage_controller(device_list):
     ]
 
     gcode_final_funcs = [
-        lambda: device.extract_axes(),
         lambda: extract_btn.config(state=NORMAL),
         lambda: window_controller.set_btn.config(state=NORMAL),
         lambda: z_test_btn.config(state=NORMAL),
@@ -911,7 +951,7 @@ def stage_controller(device_list):
         start_event,
         (
             window_controller.gcode_text.get("1.0", END),
-            device,
+            device_list,
             window_controller,
             gcode_btn,
             lock,

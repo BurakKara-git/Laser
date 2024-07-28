@@ -29,20 +29,19 @@ INITIAL_DIAMETER = 12.0
 INITIAL_VELOCITY = 1.0
 DEGREES = (20, 25, 30, 35, 40, 45, 50, 52, 54, 56, 58, 60)
 ENERGIES = {
-    20: 1.500,
-    25: 1.465,
+    20: 1.85,
     30: 1.395,
     35: 1.200,
     40: 0.995,
     45: 0.715,
-    50: 0.475,
-    52: -52,
-    54: -54,
+    50: 0.825,
+    52: 0.675,
+    54: 0.560,
     56: -56,
     58: -58,
     60: 0.105,
 }
-GCODE_PLACEHOLDER = ";The first line should be the initial positions\n"
+GCODE_PLACEHOLDER = ";The first line should be the initial positions\nG90\n"
 
 # GUI
 PROGRESS_BAR_LENGTH = 200
