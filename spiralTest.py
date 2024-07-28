@@ -1,6 +1,6 @@
 import math
 
-def generate_spiral_gcode(radius, height, turns, start_x, start_y, start_z, velocity):
+def generate_spiral_gcode(radius, height, turns, start_x, start_y, start_z):
     gcode = []
     total_steps = int(100 * turns)  
     y_step = height / total_steps  
@@ -11,9 +11,9 @@ def generate_spiral_gcode(radius, height, turns, start_x, start_y, start_z, velo
         y = start_y + step * y_step  
         x = start_x + radius * math.cos(theta) 
         z = start_z  
-        gcode.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f} F{velocity}") 
+        gcode.append(f"G0 X{x:.3f} Y{y:.3f} Z{z:.3f}") 
 
     return "\n".join(gcode)
 
-print(generate_spiral_gcode(3, 3, 3, 21.08, 13.14, 20.4, 1500))
+print(generate_spiral_gcode(3, 3, 3, 21.08, 13.14, 20.4))
 # GCode(gcode, device, window_controller, button, lock, stop_event, resume_event)
