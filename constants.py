@@ -41,7 +41,7 @@ ENERGIES = {
     58: -58,
     60: 0.105,
 }
-GCODE_PLACEHOLDER = ";The first line should be the initial positions\nG90\n"
+GCODE_PLACEHOLDER = ";The first line should be the initial positions\n"
 
 # GUI
 PROGRESS_BAR_LENGTH = 200

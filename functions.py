@@ -599,6 +599,8 @@ def GCode(
             window.print_msg("Wrong Command", "red")
             print(f"Wrong Command: {command}.")
             print(err)
+        finally:
+            return
 
     def calculate_speeds(axis_params, previous_positions, speed):
         check = ["X", "Y", "Z"]
@@ -634,7 +636,7 @@ def GCode(
             rot_speed = min(rot_speed, constants.MAX_ROT_VEL)
         else:
             rot_speed = 0
-        axis_speeds["A"] = rot_speed
+        axis_speeds["A"] = rot_speed*57.2957795
 
         return axis_speeds
 
@@ -661,16 +663,13 @@ def GCode(
     threads = []
 
     count = 0
-    while not stop_event.is_set():
+    for line in lines:
         while not resume_event.is_set():
             time.sleep(1)
             if stop_event.is_set():
                 break
-
-        if count == total_count:
+        if stop_event.is_set():
             break
-
-        line = lines[count]
         count += 1
         window.bar["value"] = (count / total_count) * 100
         window.config_progress_text(count, total_count)
@@ -690,14 +689,14 @@ def GCode(
         if all(param is None for param, _ in axis_params.values()):
             command = line.command_str
             if command in {"M3", "M4"}:
-                command = f"G0 X{constants.Z_MAX}"
+                command = f"G90 G0 X{constants.Z_MAX}"
                 thread = threading.Thread(
                     target=axis_stream, args=(translator_list[2], command)
                 )
                 threads.append(thread)
                 thread.start()
             elif command == "M5":
-                command = f"G0 X{constants.INITIAL_Z}"
+                command = f"G90 G0 X{constants.INITIAL_Z}"
                 thread = threading.Thread(
                     target=axis_stream, args=(translator_list[2], command)
                 )
@@ -717,22 +716,28 @@ def GCode(
                 if param is not None
             }
             for axis, (param, translator) in non_none_params.items():
-                command = f"{line.command_str} X{param}"
-                if line.get_param("F") is not None:
+                if axis == "A":
+                    command = f"G91 {line.command_str} X{param*57.2957795}"
+                else:
+                    command = f"G90 {line.command_str} X{param}"
+                if line.get_param("F") is not None and axis_speeds[axis] != 0:
                     command += f" F{axis_speeds[axis]}"
+                elif line.get_param("F") is not None and axis_speeds[axis] == 0:
+                    continue
                 thread = threading.Thread(
                     target=axis_stream, args=(translator, command)
                 )
+                thread.daemon = True
                 threads.append(thread)
                 thread.start()
-
-        for thread in threads:
-            thread.join()
-            print("Sub-Thread is Joined")
-
+        all_devices.wait_axes()
+    
+    for translator in translator_list:
+        translator.flush()
     for stream in stream_list:
-        stream.disable()
-
+        if not stream.check_disabled():
+            stream.disable()
+    all_devices.stop_axes()
     lock.release()
     button.invoke()
     return
