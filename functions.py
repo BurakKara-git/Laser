@@ -1,5 +1,5 @@
 from tkinter import *
-from zaber_motion import Units, MotionLibException
+from zaber_motion import Units, MotionLibException, Measurement
 from zaber_motion.ascii import WarningFlags, Device
 from zaber_motion.gcode import Translator
 import time, threading, constants, classes, functions
@@ -544,6 +544,69 @@ def mat_print(
     return
 
 
+import pvt_test
+
+
+# PVT (in dev)
+def PVT(device_list: List[Device]):
+
+    # Get the first axis from each device
+    axis_list = [device.get_axis(1) for device in device_list]
+    all_devices = classes.Device(*axis_list)
+
+    # Retrieve PVT sequences and buffers for each device
+    pvt_sequence_list = [device.pvt.get_sequence(1) for device in device_list]
+    pvt_buffer_list = [device.pvt.get_buffer(1) for device in device_list]
+
+    # Disable all PVT sequences
+    for pvt_seq in pvt_sequence_list:
+        pvt_seq.disable()
+
+    # Erase all PVT buffers
+    for pvt_buffer in pvt_buffer_list:
+        pvt_buffer.erase()
+
+    # Setup store for each PVT sequence
+    for i in range(len(pvt_sequence_list)):
+        pvt_sequence_list[i].setup_store(pvt_buffer_list[i], 1)
+
+    # Generate PVT points sequence
+    generated_sequence = pvt_test.pvt_points()
+
+    # Set initial axes positions and wait for completion
+    initial_positions = [generated_sequence.points[0].position[i] for i in range(3)] + [
+        0
+    ]
+    all_devices.set_axes(*initial_positions)
+    all_devices.wait_axes()
+
+    # Add points to each PVT sequence
+    for point in generated_sequence.points[1:]:
+        for i in range(3):
+            print("adding points")
+            pvt_sequence_list[i].point(
+                [
+                    Measurement(point.position[i], Units.LENGTH_MILLIMETRES),
+                ],
+                [
+                    Measurement(
+                        point.velocity[i], Units.VELOCITY_MILLIMETRES_PER_SECOND
+                    ),
+                ],
+                Measurement(point.time, Units.TIME_SECONDS),
+            )
+
+    # Disable all PVT sequences
+    for i in range(len(pvt_sequence_list)):
+        pvt_sequence_list[i].disable()
+
+    # Setup live mode and call each sequence with its buffer
+    for i in range(len(pvt_sequence_list)):
+        pvt_sequence_list[i].setup_live(1)
+        pvt_sequence_list[i].call(pvt_buffer_list[i])
+    return
+
+
 # GCode(In Dev)
 def GCode(
     gcode: str,
@@ -636,7 +699,7 @@ def GCode(
             rot_speed = min(rot_speed, constants.MAX_ROT_VEL)
         else:
             rot_speed = 0
-        axis_speeds["A"] = rot_speed*57.2957795
+        axis_speeds["A"] = rot_speed * 57.2957795
 
         return axis_speeds
 
@@ -731,7 +794,7 @@ def GCode(
                 threads.append(thread)
                 thread.start()
         all_devices.wait_axes()
-    
+
     for translator in translator_list:
         translator.flush()
     for stream in stream_list:

@@ -22,12 +22,12 @@ MATRIX_VELOCITY = 50.0
 # PLACEHOLDERS
 INITIAL_X = 0.0
 INITIAL_Y = 3.0
-INITIAL_Z = 22.75
+INITIAL_Z = 21.25
 INITIAL_ROT = 29333.0
 INITIAL_INCREMENT = 0.3
 INITIAL_DIAMETER = 12.0
 INITIAL_VELOCITY = 1.0
-DEGREES = (20, 25, 30, 35, 40, 45, 50, 52, 54, 56, 58, 60)
+DEGREES = (20, 25, 30, 35, 40, 45, 50, 52, 54, 56, 58, 60, 62, 64)
 ENERGIES = {
     20: 1.85,
     30: 1.395,
@@ -37,9 +37,11 @@ ENERGIES = {
     50: 0.825,
     52: 0.675,
     54: 0.560,
-    56: -56,
-    58: -58,
-    60: 0.105,
+    56: 0.540,
+    58: 0.410,
+    60: 0.301,
+    62: 0.200,
+    64: 0.117
 }
 GCODE_PLACEHOLDER = ";The first line should be the initial positions\n"
 
