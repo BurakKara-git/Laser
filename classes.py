@@ -716,15 +716,15 @@ class Ring:
         self.linear_speed = linear_speed
 
         # Calculate the angular velocities for both radii
-        w1 = self.calculate_theta_velocity(
+        self.w1 = self.calculate_theta_velocity(
             linear_speed=linear_speed, r_velocity=r_velocity, r=r1
         )
-        w2 = self.calculate_theta_velocity(
+        self.w2 = self.calculate_theta_velocity(
             linear_speed=linear_speed, r_velocity=r_velocity, r=r2
         )
 
         # Average angular velocity
-        self.w = (w1 + w2) / 2
+        self.w = (self.w1 + self.w2) / 2
 
     def calculate_theta_velocity(
         self, linear_speed: float, r_velocity: float, r: float

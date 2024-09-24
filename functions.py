@@ -613,8 +613,7 @@ def Fresnel(device_list: List[Device]):
     # Initialize Device
     axes_list = [device.get_axis(1) for device in device_list]
     device = classes.Device(*axes_list)
-    device.set_axes(constants.X_CENTER, constants.Y_CENTER, constants.INITIAL_Z, 0)
-
+    device.set_axes(constants.X_CENTER, constants.Y_CENTER, constants.Z_MAX, 0)
     # Radial distance (m),Sag (m),Height (m)
     with open(constants.HEIGHT_PATH, encoding="utf-8-sig", mode="r") as file:
         csvFile = csv.reader(file, quoting=csv.QUOTE_NONNUMERIC)
@@ -705,8 +704,8 @@ def Fresnel(device_list: List[Device]):
 
         return (points, thetas, theta_vels, rings)
 
-    R_VEL = 0.1
-    LINEAR_VEL = 20
+    R_VEL = 0.05
+    LINEAR_VEL = 30
     points, thetas, theta_vels, rings = calculate_path(
         RADIUS_LIST=constants.RADIUS_LIST,
         R_VEL=R_VEL,
@@ -720,52 +719,42 @@ def Fresnel(device_list: List[Device]):
         r.append(point.r / 1000 + x_offset)
 
     threads = []
-    device.axisz.move_absolute(constants.Z_MAX, unit=Units.LENGTH_MILLIMETRES)
+    start = time.time()
     for i in range(len(rings)):
         ring = rings[i]
         x1 = ring.r1 + x_offset
         x2 = ring.r2 + x_offset
-        time = (x2 - x1) / R_VEL
+        elapsed_time = (x2 - x1) / R_VEL
         print(
             "Time = {}, R1 = {}, R2 = {}, Angular Velocity = {}".format(
-                time, x1, x2, ring.w
+                elapsed_time, x1, x2, ring.w1
             )
         )
 
+        # Start Rotational Movement
+        device.axisrot.move_velocity(ring.w2, Units.ANGULAR_VELOCITY_RADIANS_PER_SECOND)
+
+        # Go to Rings' X and Z Positions
         device.axisx.move_absolute(position=x1, unit=Units.LENGTH_MILLIMETRES)
         device.axisz.move_absolute(ring.z1, unit=Units.LENGTH_MILLIMETRES)
 
-        rot_t = threading.Thread(
-            target=device.axisrot.move_relative,
-            args=(
-                ring.w * time,
-                Units.ANGLE_RADIANS,
-                True,
-                ring.w,
-                Units.ANGULAR_VELOCITY_RADIANS_PER_SECOND,
-            ),
+        # Start X Movement
+        device.axisx.move_absolute(
+            x2,
+            Units.LENGTH_MILLIMETRES,
+            True,
+            R_VEL,
+            Units.VELOCITY_MILLIMETRES_PER_SECOND,
         )
 
-        x_t = threading.Thread(
-            target=device.axisx.move_absolute,
-            args=(
-                x2,
-                Units.LENGTH_MILLIMETRES,
-                True,
-                R_VEL,
-                Units.VELOCITY_MILLIMETRES_PER_SECOND,
-            ),
-        )
-
-        threads.append(rot_t)
-        threads.append(x_t)
-        rot_t.start()
-        x_t.start()
-
-        for t in threads:
-            t.join()
-
+        # Set Z-Axis to Max Position (Unfocus)
         device.axisz.move_absolute(constants.Z_MAX, unit=Units.LENGTH_MILLIMETRES)
+
+        # Stop Rotational Movement
+        device.axisrot.stop()
+
+    end = time.time()
+    print("Elapsed Tİme = {}".format(end - start))
 
 
 # GCode(In Dev)
