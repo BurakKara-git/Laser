@@ -230,7 +230,7 @@ def runner(
             # Set Position and Velocities
             x_velocity = max_velocity - initial_vel * (count - passed)  # Fast to Slow
             # x_velocity = initial_vel*(count-passed) #Slow to Fast
-            x_position = x_length * (-1) ** (count + 1 + passed)
+            x_position = (x_length - constants.X_MIN) * (-1) ** (count + 1 + passed)
             y_position = y_increment
             y_velocity = 0
             avg_x_velocity = "EMPTY"
@@ -632,7 +632,7 @@ def Fresnel(device_list: List[Device]):
             return math.sqrt(linear_speed**2 - r_velocity**2) / r
 
     # Calculate and Simulate Spirals
-    def calculate_path(RADIUS_LIST, R_VEL=0.02, LINEAR_VEL=100, view=False): 
+    def calculate_path(RADIUS_LIST, R_VEL=0.02, LINEAR_VEL=100, view=False):
         if view:
             screen = Screen()
             WIDTH, HEIGHT = screen.window_width(), screen.window_height()
@@ -687,7 +687,7 @@ def Fresnel(device_list: List[Device]):
             # Get Z values in mm
             z1_diff = data[z1_index][1]
             z2_diff = data[z2_index][1]
-            
+
             # Calculate Focus Z
             z1 = constants.INITIAL_Z - z1_diff
             z2 = constants.INITIAL_Z - z2_diff
@@ -706,7 +706,7 @@ def Fresnel(device_list: List[Device]):
 
         return (points, thetas, theta_vels, rings)
 
-    R_VEL = 0.05
+    R_VEL = 0.02
     LINEAR_VEL = 40
     points, thetas, theta_vels, rings = calculate_path(
         RADIUS_LIST=constants.RADIUS_LIST,

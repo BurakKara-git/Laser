@@ -530,7 +530,7 @@ class WindowController:
 
         text_energy = Label(
             self.window,
-            text="({} µJ)".format(values[9]),
+            text="({} W)".format(values[9]),
             font=("Arial Bold", 20),
             fg="green",
         )
@@ -666,9 +666,9 @@ class Ring:
     r2 : float
         Outer radius of the ring.
     z1 : float
-        Lower z-bound of the ring.
+        Z Axis of the inner ring.
     z2 : float
-        Upper z-bound of the ring.
+        Z Axis of the outer ring.
     r_speed : float
         Radial velocity of the ring.
     linear_speed : float
