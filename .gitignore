@@ -1,0 +1,9 @@
+/dev
+/.history
+/Data
+*__pycache__
+/package
+pvt_test.py
+pvt.py
+spiral2.py
+visualization.py
