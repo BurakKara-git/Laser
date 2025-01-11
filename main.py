@@ -1,8 +1,10 @@
 from zaber_motion import Library
 from zaber_motion.ascii import Connection
-import constants, functions
+from package.functions.gui import gui
+import package.constants as constants
 import sys
 
+from package.functions.new_gui import gui as new_gui
 if __name__ == "__main__":
     Library.enable_device_db_store()
     # Establish Connections and Start Program
@@ -17,12 +19,12 @@ if __name__ == "__main__":
                 connection.enable_alerts()
                 device_list = connection.detect_devices()
                 print("RUNNING ON PHYSICAL DEVICE")
-                functions.stage_controller(device_list)
+                #gui(device_list)
+                new_gui(device_list)
 
         except Exception as e:
             print(f"Error with physical device connection: {e}")
     elif arg in {"-v", "--virtual"}:
-        try:
 
             with Connection.open_iot(
                 constants.TEST_ID, token=constants.TEST_TOKEN
@@ -30,10 +32,8 @@ if __name__ == "__main__":
                 connection.enable_alerts()
                 device_list = connection.detect_devices()
                 print("RUNNING ON VIRTUAL DEVICE")
-                functions.stage_controller(device_list)
-
-        except Exception as e:
-            print(f"Error with virtual device connection: {e}")
+                #gui(device_list)
+                new_gui(device_list)
 
     else:
         print(

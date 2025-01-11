@@ -1,8 +1,8 @@
 # RANGES(mm)
-X_MIN = 16.0
-X_MAX = 55.0
+X_MIN = 1.0
+X_MAX = 40.0
 Y_MIN = 1.0
-Y_MAX = 60.0
+Y_MAX = 40.0
 Z_MIN = 21.5
 Z_MAX = 40.0
 X_CENTER = 21.65 #Not Accurate
@@ -25,19 +25,17 @@ RADIUS_LIST = [
 
 # VELOCITIES (mm/s)
 MIN_X_VEL = 1e-3
-MAX_X_VEL = 150.0
+MAX_X_VEL = 26.0
 MIN_Y_VEL = 1e-3
-MAX_Y_VEL = 150.0
+MAX_Y_VEL = 26.0
 MIN_Z_VEL = 1e-3
-MAX_Z_VEL = 150.0
+MAX_Z_VEL = 26.0
 MAX_ROT_VEL = 50  # (Radians/s)
-Z_TEST_VELOCITY = 0.1
-MATRIX_VELOCITY = 50.0
 
 # PLACEHOLDERS
 INITIAL_X = 1.0
 INITIAL_Y = 3.0
-INITIAL_Z = 23.05
+INITIAL_Z = 22.7
 INITIAL_ROT = 0.0
 INITIAL_INCREMENT = 0.3
 INITIAL_DIAMETER = 12.0
@@ -77,9 +75,7 @@ log_head = [
     "Initial_Z(mm)",
     "Initial_Rot(native)",
 ]
-IMAGE_PATH = "sag.png"
 HEIGHT_PATH = "./Data/profile.csv"
-Z_TEST_STEP = 0.01
 
 # TEST.PY
 TEST_ID = "a8b0aabb-76ad-4394-a16e-b29e38ddac83"
