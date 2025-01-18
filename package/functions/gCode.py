@@ -111,9 +111,9 @@ def Gcode(
             return axis_list, stream_list, translator_list
         except MotionLibException as err:
             print(err)
-            button.invoke()
+            finalize(translator_list, stream_list)
             return None, None, None
-
+    
     axis_list, stream_list, translator_list = setup_devices()
     lock.acquire()
     lines = GcodeParser(gcode).lines
@@ -121,19 +121,25 @@ def Gcode(
     all_devices = Device(*axis_list)
     threads = []
 
+    def finalize():
+        for translator in translator_list:
+            translator.flush()
+        for stream in stream_list:
+            if not stream.check_disabled():
+                stream.disable()
+        all_devices.stop_axes()
+        lock.release()
+
     count = 0
     for line in lines:
         while not resume_event.is_set():
             time.sleep(1)
             if stop_event.is_set():
-                lock.release()
-                button.invoke()
-                return
-                
+                break
+
         if stop_event.is_set():
-            lock.release()
-            button.invoke()
-            return
+            break     
+        
         count += 1
 
         axis_params = {
@@ -193,13 +199,6 @@ def Gcode(
                 threads.append(thread)
                 thread.start()
         all_devices.wait_axes()
-
-    for translator in translator_list:
-        translator.flush()
-    for stream in stream_list:
-        if not stream.check_disabled():
-            stream.disable()
-    all_devices.stop_axes()
-    lock.release()
-    button.invoke()
+    
+    finalize()
     return

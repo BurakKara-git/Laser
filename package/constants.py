@@ -5,8 +5,8 @@ Y_MIN = 1.0
 Y_MAX = 40.0
 Z_MIN = 21.5
 Z_MAX = 40.0
-X_CENTER = 21.65 #Not Accurate
-Y_CENTER = 15.72 #Not Accurate
+X_CENTER = 22.31 #Not Accurate
+Y_CENTER = 15.77 #Not Accurate
 RADIUS_LIST = [
     [0, 420],
     [742, 957],
@@ -35,7 +35,7 @@ MAX_ROT_VEL = 50  # (Radians/s)
 # PLACEHOLDERS
 INITIAL_X = 1.0
 INITIAL_Y = 3.0
-INITIAL_Z = 22.7
+INITIAL_Z = 23.09
 INITIAL_ROT = 0.0
 INITIAL_INCREMENT = 0.3
 INITIAL_DIAMETER = 12.0
@@ -58,6 +58,15 @@ ENERGIES = {
 }
 GCODE_PLACEHOLDER = ";The first line should be the initial positions\n"
 
+# FRESNEL PARAMETERS
+LINEAR_VELOCITY = 40.0
+LINE_WIDTH = 0.006
+R_RANGE = 3.00
+Z_MAX = 40.0
+INCLINATION = 0.08 #degrees
+W_OFFSET = 0.23 #radians
+dt = 0.1
+
 # GUI
 PROGRESS_BAR_LENGTH = 200
 
@@ -78,5 +87,5 @@ log_head = [
 HEIGHT_PATH = "./Data/profile.csv"
 
 # TEST.PY
-TEST_ID = "a8b0aabb-76ad-4394-a16e-b29e38ddac83"
+TEST_ID = "6b905f6d-38e4-45ea-a214-f010d73762a6"
 TEST_TOKEN = "VJ_GV-w4_fYUQiI8zrSpz2F6Bh2ZLpCF"

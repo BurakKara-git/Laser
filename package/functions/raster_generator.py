@@ -1,29 +1,15 @@
-from tkinter import Button
-from package.functions.writer import writer
-from package.functions.logger import logger
-from zaber_motion.ascii import Device as ZaberDevice
-from zaber_motion import Units, MotionLibException
-from package.classes.WindowController import WindowController
-from package.classes.Device import Device
-import time, threading, package.constants as constants
-from package.functions.gCode import Gcode
-from typing import List
+import package.constants as constants
+from tkinter import *
 
-def raster_scan(
-    window: WindowController,
-    device_list: List[ZaberDevice],
-    button: Button,
-    lock: threading.Lock,
-    stop_event: threading.Event,
-    resume_event: threading.Event,
-):
-    values = window.get_values()
+def raster_generator(win, gcode_text, values):
     initial_x = values[0]
     initial_y = values[1]
+    initial_z = values[2]
+    initial_rot = values[3]
     y_increment = values[4]
     dia = values[5]
+    x_length = values[6]
     initial_vel = values[7]
-
     # Calculate Total Task
     total_task = int((dia) / y_increment)
     if total_task > constants.MAX_X_VEL:
@@ -40,7 +26,7 @@ def raster_scan(
     passed = 0
 
     #Generate Raster Scan
-    gCode = ";"
+    gCode = "G0 X{} Y{} Z{} A{};Initial Positions\n".format(initial_x,initial_y,initial_z, initial_rot)
     for i in range(total_task):
         if (i+passed)%2 == 0:
             x_position = constants.X_MAX
@@ -50,14 +36,15 @@ def raster_scan(
         y_position = initial_y + (i+1)*y_increment
 
         if i == int(total_task / 2) + 1:
+            gCode += ";PASSED\n"
             gCode += "G0 Y{}\n".format(y_position)
             passed += 1
         
         else:
             gCode += "G1 X{} F{}\n".format(x_position, feed_rate)
-            gCode += "G0 Y{}\n".format(y_position)      
-    print(gCode)
-
-    Gcode(gCode,device_list,window,button,lock,stop_event,resume_event)
-
-    return
+            gCode += "G0 Y{}\n".format(y_position)
+    gCode += "G0 Z{};Unfocus\n".format(constants.Z_MAX)    
+    gCode += "G0 X{} Y{};Extract Axes\n".format(constants.X_MAX, constants.Y_MAX)  
+    gcode_text.delete('1.0', END)
+    gcode_text.insert("end", gCode)
+    win.destroy()

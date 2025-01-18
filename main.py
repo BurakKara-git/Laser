@@ -1,10 +1,9 @@
 from zaber_motion import Library
 from zaber_motion.ascii import Connection
-from package.functions.gui import gui
 import package.constants as constants
 import sys
+from package.gui.gui import gui
 
-from package.functions.new_gui import gui as new_gui
 if __name__ == "__main__":
     Library.enable_device_db_store()
     # Establish Connections and Start Program
@@ -19,8 +18,7 @@ if __name__ == "__main__":
                 connection.enable_alerts()
                 device_list = connection.detect_devices()
                 print("RUNNING ON PHYSICAL DEVICE")
-                #gui(device_list)
-                new_gui(device_list)
+                gui(device_list)
 
         except Exception as e:
             print(f"Error with physical device connection: {e}")
@@ -32,8 +30,7 @@ if __name__ == "__main__":
                 connection.enable_alerts()
                 device_list = connection.detect_devices()
                 print("RUNNING ON VIRTUAL DEVICE")
-                #gui(device_list)
-                new_gui(device_list)
+                gui(device_list)
 
     else:
         print(
