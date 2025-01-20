@@ -15,7 +15,7 @@ def fresnel_window(window, device_list):
     def get_value():
         radius_list = radius_list_generator(radius_list_text.get("1.0", END))
         values = []
-        sets = [set_dt, set_LINEAR_VELOCITY, set_X_CENTER, set_Y_CENTER, set_INITIAL_Z, set_inclination, set_w_offset,set_R_RANGE]
+        sets = [set_dt, set_LINEAR_VELOCITY, set_X_CENTER, set_Y_CENTER, set_INITIAL_Z, set_inclination, set_w_offset, set_R_RANGE, set_linewidth]
         for set in sets:
             values.append(float(set.get()))
         values.append(radius_list)
@@ -70,12 +70,15 @@ def fresnel_window(window, device_list):
     set_dt = EntryWithPlaceholder(
         win, constants.dt, "Time Step", 8, 0
     )
+    set_linewidth = EntryWithPlaceholder(
+        win, constants.LINE_WIDTH, "Line Width (Separation=LW/2)", 9, 0
+    )
 
     radius_str = "\n".join(str(x)[1:-1] for x in constants.RADIUS_LIST)
     radius_list_label = Label(win, text="Radius List Input", font=("Arial Bold", 20))
     radius_list_text = Text(win, height=20, width=52)
-    radius_list_label.grid(column=6, row=1)
-    radius_list_text.grid(column=6, row=2)
+    radius_list_label.grid(column=2, row=1)
+    radius_list_text.grid(column=2, row=2, rowspan=7)
     radius_list_text.insert("end", radius_str)
 
     # Fresnel Button Configuration
@@ -90,9 +93,9 @@ def fresnel_window(window, device_list):
     fresnel_command = lambda: thread_switch(
         fresnel,
         start_event,
-        (device_list, *get_value(),lock,start_event),
+        (device_list, *get_value(),lock,start_event,start_btn),
         fresnel_initial_funcs,
         fresnel_final_funcs,
     )
 
-    start_btn = create_button(win,"START",fresnel_command, 9,0)
+    start_btn = create_button(win,"START",fresnel_command, 10,0)

@@ -27,18 +27,18 @@ def gui(device_list):
     window.geometry("1280x720")
 
     char_btn = create_button(
-        window, "Characterisation", lambda: char_window(window, gcode_text), 3, 3
+        window, "Characterisation", lambda: char_window(window, gcode_text), 1, 5
     )
 
     fresnel_btn = create_button(
-        window, "Fresnel", lambda: fresnel_window(window, device_list), 4, 3
+        window, "Fresnel", lambda: fresnel_window(window, device_list), 2, 5
     )
 
     # GCode Button Configuration
     gcode_label = Label(window, text="GCode Input", font=("Arial Bold", 20))
     gcode_text = Text(window, height=5, width=52)
-    gcode_label.grid(row=0, column=0)
-    gcode_text.grid(row=1, column=0)
+    gcode_label.grid(row=0, column=2)
+    gcode_text.grid(row=1, column=1,  columnspan= 3, rowspan = 2)
     gcode_text.insert("end", constants.GCODE_PLACEHOLDER)
 
     gcode_initial_funcs = [
@@ -73,7 +73,7 @@ def gui(device_list):
         gcode_final_funcs,
     )
 
-    gcode_btn = create_button(window, "Start GCode", gcode_command, 3, 0)
+    gcode_btn = create_button(window, "Start GCode", gcode_command, 3, 2)
 
        # Pause Button Configuration
     pause_initial_funcs = [
@@ -88,9 +88,9 @@ def gui(device_list):
         None, pause_event, None, pause_initial_funcs, pause_final_funcs
     )
 
-    pause_btn = create_button(window, "PAUSE", pause_command, 4, 0)
+    pause_btn = create_button(window, "PAUSE", pause_command, 3, 1)
 
     # Extract Button Configuration
-    extract_btn = create_button(window, "EXTRACT", lambda: device.extract_axes(), 5, 0)
+    extract_btn = create_button(window, "EXTRACT", lambda: device.extract_axes(), 3, 3)
 
     window.mainloop()

@@ -19,6 +19,7 @@ def Fresnel_new(
     X_CENTER,
     Y_CENTER,
     INITIAL_Z,
+    LINE_WIDTH,
     RADIUS_LIST,
     inclination,
     w_offset,
@@ -27,8 +28,8 @@ def Fresnel_new(
 ):
     if stop_event.is_set():
         return
-    SEPARATION = constants.LINE_WIDTH / 2
-    max_t = (constants.R_RANGE**2) * np.pi / (constants.LINEAR_VELOCITY * SEPARATION)
+    SEPARATION = LINE_WIDTH / 2
+    max_t = (R_RANGE**2) * np.pi / (LINEAR_VELOCITY * SEPARATION)
     inclination = inclination * np.pi / 180
 
     # Generate times, angular and linear velocities
@@ -84,7 +85,7 @@ def Fresnel_new(
         Measurement(0.2, Units.TIME_MILLISECONDS),
     )
 
-    axis_z.generic_command_no_response(initial_sin_command)
+    # axis_z.generic_command_no_response(initial_sin_command)
 
     # Initial values
     start = time.time()
@@ -107,10 +108,14 @@ def Fresnel_new(
                 radius_num += 1
 
         # Focus
-        axis_z.generic_command_no_response(stop_sin_command)
+        # axis_z.generic_command_no_response(stop_sin_command)
         if is_focused:
             z1_index = int(current_rel_x)
-            z1_diff = data[z1_index][1]
+            try:
+                z1_diff = data[z1_index][1]
+            except:
+                print("Reached Lens Profile")
+                return
             # Calculate Focus Z
             z_c = (
                 (current_rel_x * 1e-3)
@@ -135,7 +140,7 @@ def Fresnel_new(
             Measurement(amplitude, Units.LENGTH_MILLIMETRES),
             Measurement(period, Units.TIME_MILLISECONDS),
         )
-        axis_z.generic_command_no_response(sin_command)
+        # axis_z.generic_command_no_response(sin_command)
 
         print(
             "x = {}, z = {}, z_c = {}, w = {}, v_r = {}, V = {}".format(
@@ -324,9 +329,11 @@ def fresnel(
     inclination,
     w_offset,
     R_RANGE,
+    LINE_WIDTH,
     RADIUS_LIST,
     lock: threading.Lock,
     stop_event: threading.Event,
+    button,
 ):
     axes_list = [device.get_axis(1) for device in device_list]
 
@@ -348,6 +355,7 @@ def fresnel(
             X_CENTER,
             Y_CENTER,
             INITIAL_Z,
+            LINE_WIDTH,
             RADIUS_LIST,
             inclination,
             w_offset,
@@ -358,3 +366,4 @@ def fresnel(
         axes.stop()
     axes_list[2].move_absolute(constants.Z_MAX, Units.LENGTH_MILLIMETRES)  # Unfocus
     lock.release()
+    return
