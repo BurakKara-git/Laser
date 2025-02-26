@@ -1,14 +1,12 @@
-from zaber_motion import Measurement
-from zaber_motion import Units
+from zaber_motion import Measurement, Units
 from zaber_motion.ascii import Axis
 from package.classes.Ring import Ring
 from package.classes.Device import Device
 from package.classes.Point import Point
 import package.constants as constants
-import time, csv
+import time, csv, threading
 import numpy as np
 from typing import List
-import threading
 
 
 def Fresnel_new(
@@ -26,6 +24,38 @@ def Fresnel_new(
     R_RANGE,
     stop_event: threading.Event,
 ):
+    """
+    Controls a Fresnel scanning system using linear and rotational motion.
+
+    This function moves a system along a spiral trajectory, adjusting focus dynamically
+    based on a given height profile (`data`). The motion is defined by a combination of 
+    radial and angular velocities, calculated to maintain a consistent linear velocity.
+
+    Args:
+        axes (List[Axis]): List of axes controlling X, Y, Z, and rotation.
+        data (list): Height profile data in a 2D list format.
+        dt (float): Time step for trajectory calculations.
+        LINEAR_VELOCITY (float): Desired linear velocity in mm/s.
+        X_CENTER (float): X-coordinate of the system's center in mm.
+        Y_CENTER (float): Y-coordinate of the system's center in mm.
+        INITIAL_Z (float): Initial Z-position in mm.
+        LINE_WIDTH (float): Width of each scanning line in mm.
+        RADIUS_LIST (list): List of tuples defining radial scan regions [(r_min, r_max), ...].
+        inclination (float): Angle of inclination in degrees.
+        w_offset (float): Angular offset in radians.
+        R_RANGE (float): Maximum radial range in mm.
+        stop_event (threading.Event): Event to signal termination of movement.
+
+    Returns:
+        None
+
+    Notes:
+        - The function calculates and executes a movement trajectory based on a
+          CLV spiral, updating X and rotational movement dynamically.
+        - The Z-axis adjusts focus dynamically based on the provided height profile.
+        - If `stop_event` is set, the function terminates immediately.
+        - If the first ring will be executed change 'is_focused = True'
+    """
     if stop_event.is_set():
         return
     SEPARATION = LINE_WIDTH / 2
@@ -67,6 +97,7 @@ def Fresnel_new(
     initial_radians = axis_rot.get_position(Units.ANGLE_RADIANS)
 
     # Focus/Unfocus Z
+    # If the first ring will be executed change is_focused = True
     is_focused = False
     if is_focused:
         axis_z.move_absolute(INITIAL_Z, Units.LENGTH_MILLIMETRES)
@@ -77,15 +108,6 @@ def Fresnel_new(
     unfocus_command = axis_z.prepare_command(
         "move abs ?", Measurement(constants.Z_MAX, Units.LENGTH_MILLIMETRES)
     )
-    stop_sin_command = axis_z.prepare_command("move sin stop")
-
-    initial_sin_command = axis_z.prepare_command(
-        "move sin ? ?",
-        Measurement(0, Units.LENGTH_MILLIMETRES),
-        Measurement(0.2, Units.TIME_MILLISECONDS),
-    )
-
-    # axis_z.generic_command_no_response(initial_sin_command)
 
     # Initial values
     start = time.time()
@@ -108,7 +130,6 @@ def Fresnel_new(
                 radius_num += 1
 
         # Focus
-        # axis_z.generic_command_no_response(stop_sin_command)
         if is_focused:
             z1_index = int(current_rel_x)
             try:
@@ -133,17 +154,8 @@ def Fresnel_new(
             z1 = constants.Z_MAX
             axis_z.generic_command_no_response(unfocus_command)
 
-        amplitude = current_rel_x * 1e-3 * inclination
-        period = round(1e3 * 2 * np.pi / angular_velocity[i], 1)
-        sin_command = axis_z.prepare_command(
-            "move sin ? ?",
-            Measurement(amplitude, Units.LENGTH_MILLIMETRES),
-            Measurement(period, Units.TIME_MILLISECONDS),
-        )
-        # axis_z.generic_command_no_response(sin_command)
-
         print(
-            "x = {}, z = {}, z_c = {}, w = {}, v_r = {}, V = {}".format(
+            "x = {:.3f}, z = {:.3f}, z_c = {:.3f}, w = {:.3f}, v_r = {:.3f}, V = {:.3f}".format(
                 current_rel_x, z1, z_c, angular_velocity[i], r_velocity[i], V[i]
             )
         )
@@ -192,6 +204,18 @@ def Fresnel_new(
 def Fresnel_old(
     axes, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event: threading.Event
 ):
+    """
+    Performs an old Fresnel scanning process.
+
+    Parameters:
+        axes (list): List of axes.
+        data (list): Height data from CSV.
+        X_CENTER (float): X-axis center position in mm.
+        Y_CENTER (float): Y-axis center position in mm.
+        INITIAL_Z (float): Initial Z-axis height in mm.
+        RADIUS_LIST (list): List of radius ranges for scanning.
+        stop_event (threading.Event): Event to stop execution.
+    """
     if stop_event.is_set():
         return
     # Initialize Device
@@ -241,8 +265,8 @@ def Fresnel_old(
                 points.append(Point(x, y, INITIAL_Z))
 
             # Calculate Z Positions
-            z1_index = RADIUS_LIST[i][0]
-            z2_index = RADIUS_LIST[i][1]
+            z1_index = int(RADIUS_LIST[i][0])
+            z2_index = int(RADIUS_LIST[i][1])
 
             # Get Z values in mm
             z1_diff = data[z1_index][1]
@@ -333,37 +357,70 @@ def fresnel(
     RADIUS_LIST,
     lock: threading.Lock,
     stop_event: threading.Event,
-    button,
+    button=None,  # If unused, set a default value
 ):
+    """
+    Executes Fresnel scanning by running old and new algorithms while handling concurrency.
+    
+    Parameters:
+        device_list (list): List of device objects.
+        dt (float): Time step for calculations.
+        LINEAR_VELOCITY (float): Linear velocity in mm/s.
+        X_CENTER (float): Center X coordinate in mm.
+        Y_CENTER (float): Center Y coordinate in mm.
+        INITIAL_Z (float): Initial Z height in mm.
+        inclination (float): Tilt angle for scanning in angles.
+        w_offset (float): Angular offset in radians.
+        R_RANGE (tuple): Range of radii for scanning in mm.
+        LINE_WIDTH (float): Width of scan lines in mm.
+        RADIUS_LIST (list): List of radii to scan.
+        lock (threading.Lock): Lock for thread safety.
+        stop_event (threading.Event): Event to signal stopping.
+        button (optional): Button for UI control (if applicable).
+    """
+
+    # Get axes from the devices
     axes_list = [device.get_axis(1) for device in device_list]
 
-    # Radial distance (m),Sag (m),Height (m)
-    with open(constants.HEIGHT_PATH, encoding="utf-8-sig", mode="r") as file:
-        csvFile = csv.reader(file, quoting=csv.QUOTE_NONNUMERIC)
-        data = list(csvFile)
+    # Load height data (Radial distance, Sag, Height)
+    try:
+        with open(constants.HEIGHT_PATH, encoding="utf-8-sig", mode="r") as file:
+            csvFile = csv.reader(file, quoting=csv.QUOTE_NONNUMERIC)
+            data = list(csvFile)
+    except Exception as e:
+        print(f"Error loading height data: {e}")
+        return
 
-    # Convert m to mm with µm precision
+    # Convert meters to millimeters with micrometer precision
     data = [[float("%.3f" % (j * 1000)) for j in i] for i in data]
-    lock.acquire()
-    if not stop_event.is_set():
-        # Fresnel_old(axes_list, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST,stop_event)
-        Fresnel_new(
-            axes_list,
-            data,
-            dt,
-            LINEAR_VELOCITY,
-            X_CENTER,
-            Y_CENTER,
-            INITIAL_Z,
-            LINE_WIDTH,
-            RADIUS_LIST,
-            inclination,
-            w_offset,
-            R_RANGE,
-            stop_event,
-        )
-    for axes in axes_list:
-        axes.stop()
-    axes_list[2].move_absolute(constants.Z_MAX, Units.LENGTH_MILLIMETRES)  # Unfocus
-    lock.release()
-    return
+
+    # Acquire lock
+    with lock:
+        if not stop_event.is_set():
+            # Execute the old and new Fresnel scanning methods
+            Fresnel_old(axes_list, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event)
+            Fresnel_new(
+                axes_list,
+                data,
+                dt,
+                LINEAR_VELOCITY,
+                X_CENTER,
+                Y_CENTER,
+                INITIAL_Z,
+                LINE_WIDTH,
+                RADIUS_LIST,
+                inclination,
+                w_offset,
+                R_RANGE,
+                stop_event,
+            )
+
+        # Stop all movement
+        for axes in axes_list:
+            axes.stop()
+
+        # Move Z-axis to unfocus position only if stop_event is not set
+        if not stop_event.is_set():
+            axes_list[2].move_absolute(constants.Z_MAX, Units.LENGTH_MILLIMETRES)
+            axes_list[3].stop() 
+
