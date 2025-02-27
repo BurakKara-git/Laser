@@ -71,6 +71,7 @@ def Fresnel_new(
         np.sqrt(LINEAR_VELOCITY * SEPARATION * dt / np.pi) / dt
     )
     print(angular_velocity[0], r_velocity[0])
+    print("Critical Radius = {}".format(LINEAR_VELOCITY / constants.MAX_ROT_VEL))
     V = np.sqrt(
         pow((angular_velocity * times * r_velocity * 2), 2) + pow(r_velocity, 2)
     )
@@ -248,7 +249,7 @@ def Fresnel_old(
         thetas = []
         rings = []
 
-        for i in range(len(RADIUS_LIST)):
+        for i in range(1):
             r = RADIUS_LIST[i][0]
             x = r * np.cos(theta)
             y = r * np.sin(theta)
@@ -398,7 +399,8 @@ def fresnel(
     with lock:
         if not stop_event.is_set():
             # Execute the old and new Fresnel scanning methods
-            Fresnel_old(axes_list, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event)
+            if abs(RADIUS_LIST[0][0] - RADIUS_LIST[0][1]) >= 1e-4:
+                Fresnel_old(axes_list, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event)
             Fresnel_new(
                 axes_list,
                 data,
