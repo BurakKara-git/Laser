@@ -3,6 +3,7 @@ from zaber_motion.ascii import Axis
 from package.classes.Ring import Ring
 from package.classes.Device import Device
 from package.classes.Point import Point
+from package.functions.sleep import sleep
 import package.constants as constants
 import time, csv, threading
 import numpy as np
@@ -174,7 +175,7 @@ def Fresnel_new(
         # Move axes
         axis_rot.generic_command_no_response(cmd_rot)
         axis_x.generic_command_no_response(cmd_x)
-        time.sleep(dt)
+        sleep(dt)
 
         # Update position
         current_rel_x += r_velocity[i] * dt * 1000
