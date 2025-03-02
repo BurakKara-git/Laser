@@ -2,7 +2,8 @@ import datetime, os, csv
 
 # Write the File
 def writer(log_head, log_tail):
-    """Writes log data to a CSV file.
+    """
+    Writes log data to a CSV file.
 
     Creates a CSV file named with the current date and time, stores it in a folder
     structure under 'Data' directory, and writes log data with a header and rows.

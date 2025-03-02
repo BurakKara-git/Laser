@@ -20,14 +20,17 @@ def Gcode(
     Executes G-code commands on a list of devices, controlling their movements
     based on the parsed G-code instructions.
 
-    Parameters:
-    - gcode (str): The G-code string containing the movement commands.
-    - device_list (List[Device]): List of Device objects representing the axes to be controlled.
-    - window (classes.WindowController): The window controller for updating UI elements.
-    - button (Button): Button to invoke upon completion or error.
-    - lock (threading.Lock): Thread lock to control access to shared resources.
-    - stop_event (threading.Event): Event to signal stopping the execution.
-    - resume_event (threading.Event): Event to signal resuming the execution.
+    Args:
+        gcode (str): The G-code string containing the movement commands.
+        device_list (List[Device]): List of Device objects representing the axes to be controlled.
+        window (classes.WindowController): The window controller for updating UI elements.
+        button (Button): Button to invoke upon completion or error.
+        lock (threading.Lock): Thread lock to control access to shared resources.
+        stop_event (threading.Event): Event to signal stopping the execution.
+        resume_event (threading.Event): Event to signal resuming the execution.
+
+    Returns:
+        None
 
     This function performs the following steps:
     1. Parses the G-code lines.
@@ -39,17 +42,17 @@ def Gcode(
     7. Releases the lock and invokes the button upon completion or if an error occurs.
 
     Internal helper functions:
-    - axis_stream(translator: Translator, command: str): Sends a command to a specific translator.
-    - calculate_speeds(axis_params, previous_positions, speed): Calculates the speeds for each axis based on the parameters.
-    - setup_devices(): Sets up the device streams and translators.
+        - axis_stream(translator: Translator, command: str): Sends a command to a specific translator.
+        - calculate_speeds(axis_params, previous_positions, speed): Calculates the speeds for each axis based on the parameters.
+        - setup_devices(): Sets up the device streams and translators.
 
     Example usage:
-    ```python
-    GCode(gcode_str, device_list, window_controller, button, lock, stop_event, resume_event)
-    ```
+        ```python
+        GCode(gcode_str, device_list, window_controller, button, lock, stop_event, resume_event)
+        ```
 
-    Note:
-    - The function prints and updates the UI in case of errors.
+    Notes:
+        - The function prints and updates the UI in case of errors.
     """
 
     def axis_stream(translator: Translator, command: str):

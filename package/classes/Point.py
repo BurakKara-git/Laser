@@ -2,46 +2,36 @@ import math
 
 class Point:
     """
-    A class to represent a 3D point in Cartesian, Polar, and Cylindrical coordinates.
+    Represents a 3D point in Cartesian, Polar, and Cylindrical coordinates.
 
     Attributes:
-    ----------
-    x : float
-        X-coordinate in the Cartesian coordinate system.
-    y : float
-        Y-coordinate in the Cartesian coordinate system.
-    z : float
-        Z-coordinate in the Cartesian coordinate system.
-    r : float
-        Radial distance in the Polar/Cylindrical coordinate system.
-    theta : float
-        Angle (in radians) in the Polar/Cylindrical coordinate system.
+        x (float): X-coordinate in the Cartesian coordinate system.
+        y (float): Y-coordinate in the Cartesian coordinate system.
+        z (float): Z-coordinate in the Cartesian coordinate system.
+        r (float): Radial distance in the Polar/Cylindrical coordinate system.
+        theta (float): Angle (in radians) in the Polar/Cylindrical coordinate system.
 
     Methods:
-    -------
-    cartesian():
-        Returns the point in Cartesian coordinates (x, y, z).
+        cartesian() -> tuple[float, float, float]:
+            Returns the point in Cartesian coordinates (x, y, z).
+        
+        polar() -> tuple[float, float]:
+            Returns the point in Polar coordinates (r, theta).
 
-    polar():
-        Returns the point in Polar coordinates (r, theta).
-
-    cylindrical():
-        Returns the point in Cylindrical coordinates (r, theta, z).
+        cylindrical() -> tuple[float, float, float]:
+            Returns the point in Cylindrical coordinates (r, theta, z).
     """
 
     def __init__(self, x: float, y: float, z: float):
         """
-        Initializes the point with Cartesian coordinates and calculates
-        the radial distance (r) and angular coordinate (theta) for Polar/Cylindrical coordinates.
+        Initializes the point with Cartesian coordinates and calculates 
+        the radial distance (`r`) and angular coordinate (`theta`) for 
+        Polar/Cylindrical coordinates.
 
-        Parameters:
-        ----------
-        x : float
-            The X-coordinate in Cartesian coordinates.
-        y : float
-            The Y-coordinate in Cartesian coordinates.
-        z : float
-            The Z-coordinate in Cartesian coordinates.
+        Args:
+            x (float): The X-coordinate in Cartesian coordinates.
+            y (float): The Y-coordinate in Cartesian coordinates.
+            z (float): The Z-coordinate in Cartesian coordinates.
         """
         self.x = x
         self.y = y
@@ -57,9 +47,7 @@ class Point:
         Returns the Cartesian coordinates (x, y, z) of the point.
 
         Returns:
-        -------
-        tuple:
-            A tuple containing (x, y, z) representing Cartesian coordinates.
+            tuple[float, float, float]: A tuple containing (x, y, z) representing Cartesian coordinates.
         """
         return (self.x, self.y, self.z)
 
@@ -68,9 +56,7 @@ class Point:
         Returns the Polar coordinates (r, theta) of the point.
 
         Returns:
-        -------
-        tuple:
-            A tuple containing (r, theta)
+            tuple[float, float]: A tuple containing (r, theta).
         """
         return (self.r, self.theta)
 
@@ -79,8 +65,6 @@ class Point:
         Returns the Cylindrical coordinates (r, theta, z) of the point.
 
         Returns:
-        -------
-        tuple:
-            A tuple containing (r, theta, z)
+            tuple[float, float, float]: A tuple containing (r, theta, z).
         """
         return (self.r, self.theta, self.z)

@@ -3,27 +3,19 @@ import math
 
 class Ring:
     """
-    A class to represent a ring moving in 3D space with given radial distances and speeds.
+    Represents a ring moving in 3D space with given radial distances and speeds.
 
     Attributes:
-    ----------
-    r1 : float
-        Inner radius of the ring.
-    r2 : float
-        Outer radius of the ring.
-    z1 : float
-        Z Axis of the inner ring.
-    z2 : float
-        Z Axis of the outer ring.
-    r_speed : float
-        Radial velocity of the ring.
-    linear_speed : float
-        Linear speed of the ring.
+        r1 (float): Inner radius of the ring.
+        r2 (float): Outer radius of the ring.
+        z1 (float): Z axis of the inner ring.
+        z2 (float): Z axis of the outer ring.
+        r_speed (float): Radial velocity of the ring.
+        linear_speed (float): Linear speed of the ring.
 
     Methods:
-    -------
-    calculate_theta_velocity(linear_speed: float, r_velocity: float, r: float) -> float:
-        Calculates and returns the angular velocity (theta_vel) of the ring.
+        calculate_theta_velocity(linear_speed: float, r_velocity: float, r: float) -> float:
+            Calculates and returns the angular velocity (theta_vel) of the ring.
     """
 
     def __init__(
@@ -36,23 +28,16 @@ class Ring:
         linear_speed: float,
     ):
         """
-        Initializes the ring with given radial distances, speeds, and calculates
+        Initializes the ring with given radial distances, speeds, and calculates 
         the average angular velocity (w).
 
-        Parameters:
-        ----------
-        r1 : float
-            Inner radius of the ring.
-        r2 : float
-            Outer radius of the ring.
-        z1 : float
-            Z Axis of the inner ring.
-        z2 : float
-            Z Axis of the outer ring.
-        r_velocity : float
-            Radial velocity of the ring.
-        linear_speed : float
-            Linear speed of the ring.
+        Args:
+            r1 (float): Inner radius of the ring.
+            r2 (float): Outer radius of the ring.
+            z1 (float): Z axis of the inner ring.
+            z2 (float): Z axis of the outer ring.
+            r_velocity (float): Radial velocity of the ring.
+            linear_speed (float): Linear speed of the ring.
         """
         self.r1 = r1
         self.r2 = r2
@@ -76,22 +61,16 @@ class Ring:
         self, linear_speed: float, r_velocity: float, r: float
     ) -> float:
         """
-        Calculates the angular velocity (theta_vel) based on the ring's linear speed,
+        Calculates the angular velocity (theta_vel) based on the ring's linear speed, 
         radial velocity, and radius.
 
-        Parameters:
-        ----------
-        linear_speed : float
-            Linear speed of the ring.
-        r_velocity : float
-            Radial velocity of the ring.
-        r : float
-            Radius at which the angular velocity is being calculated.
+        Args:
+            linear_speed (float): Linear speed of the ring.
+            r_velocity (float): Radial velocity of the ring.
+            r (float): Radius at which the angular velocity is being calculated.
 
         Returns:
-        -------
-        float:
-            The calculated angular velocity (theta_vel).
+            float: The calculated angular velocity (theta_vel).
         """
         theta_vel = 0
 

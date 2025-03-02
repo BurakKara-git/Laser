@@ -27,14 +27,16 @@ class Device:
         self.axes = [self.axisx, self.axisy, self.axisz, self.axisrot]
 
     def get_current_positions(self):
-        """Returns the current positions of all axes.
+        """
+        Returns the current positions of all axes.
 
         Returns:
-            list: A list containing the current positions of the axes:
-                - Index 0: X position in millimeters (float).
-                - Index 1: Y position in millimeters (float).
-                - Index 2: Z position in millimeters (float).
-                - Index 3: Rotation position in native units (float).
+            list[float]: A list containing the current positions of the axes:
+            
+            - `list[0]`: X position in millimeters.
+            - `list[1]`: Y position in millimeters.
+            - `list[2]`: Z position in millimeters.
+            - `list[3]`: Rotation position in native units.
         """
         x_pos = self.axisx.get_position(Units.LENGTH_MILLIMETRES)
         y_pos = self.axisy.get_position(Units.LENGTH_MILLIMETRES)
@@ -108,39 +110,45 @@ class Device:
         acceleration_unit=Units.NATIVE,
     ):
         """
-        Safely attempts to move an axis with specified parameters, handling any
-        MotionLibException that may occur.
+        Safely attempts to move an axis with specified parameters, handling any 
+        `MotionLibException` that may occur.
 
         Args:
-        - axis (Axis): The axis to move.
-        - type (str): The type of movement, such as 'move_absolute' or 'move_relative'.
-        - position (float): The target position for the movement.
-        - unit: The unit of measurement for the position.
-        - wait_until_idle (bool, optional): Whether to wait until the axis is idle after the move. Default is True.
-        - velocity (float, optional): The velocity for the movement. Default is 0.
-        - velocity_unit (optional): The unit of measurement for the velocity. Default is Units.NATIVE.
-        - acceleration (float, optional): The acceleration for the movement. Default is 0.
-        - acceleration_unit (optional): The unit of measurement for the acceleration. Default is Units.NATIVE.
+            axis (Axis): The axis to move.
+            type (str): The type of movement, such as `'move_absolute'` or `'move_relative'`.
+            position (float): The target position for the movement.
+            unit: The unit of measurement for the position.
+            wait_until_idle (bool, optional): Whether to wait until the axis is idle after the move. 
+                Defaults to `True`.
+            velocity (float, optional): The velocity for the movement. Defaults to `0`.
+            velocity_unit (optional): The unit of measurement for the velocity. 
+                Defaults to `Units.NATIVE`.
+            acceleration (float, optional): The acceleration for the movement. Defaults to `0`.
+            acceleration_unit (optional): The unit of measurement for the acceleration. 
+                Defaults to `Units.NATIVE`.
 
         Returns:
-        - None
+            None
+
+        Raises:
+            MotionLibException: If an error occurs during the movement operation.
 
         This method tries to perform a movement operation on the given axis using the specified parameters.
-        If a MotionLibException is encountered, the exception is caught, and the error message is printed.
+        If a `MotionLibException` is encountered, the exception is caught, and the error message is printed.
 
-        Example usage:
-        ```python
-        move_try_except(
-            axis=my_axis,
-            type='move_absolute',
-            position=10.0,
-            unit=Units.LENGTH_MILLIMETRES,
-            velocity=5.0,
-            velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND,
-            acceleration=2.0,
-            acceleration_unit=Units.ACCELERATION_MILLIMETRES_PER_SECOND_SQUARED
-        )
-        ```
+        Example:
+            ```python
+            move_try_except(
+                axis=my_axis,
+                type='move_absolute',
+                position=10.0,
+                unit=Units.LENGTH_MILLIMETRES,
+                velocity=5.0,
+                velocity_unit=Units.VELOCITY_MILLIMETRES_PER_SECOND,
+                acceleration=2.0,
+                acceleration_unit=Units.ACCELERATION_MILLIMETRES_PER_SECOND_SQUARED
+            )
+            ```
         """
         try:
             movement = getattr(axis, type)
@@ -161,27 +169,25 @@ class Device:
         """
         Moves the Z-axis to the initial focus position.
 
-        This method calls the `move_try_except` function to move the Z-axis of the device
-        to the predefined initial focus position specified by `constants.INITIAL_Z`.
+        This method calls `move_try_except` to move the Z-axis of the device to the predefined 
+        initial focus position specified by `constants.INITIAL_Z`.
 
-        Parameters:
-        None
+        Args:
+            None
 
-        Usage:
-        Call this method to set the Z-axis to the initial focus position, typically used
-        for setting up the initial focus before starting other movements or operations.
+        Returns:
+            None
 
         Example:
-        ```python
-        device.focus()
-        ```
+            ```python
+            device.focus()
+            ```
 
         Notes:
-        - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
-        - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
-        - The `position` parameter is set to `constants.INITIAL_Z`, specifying the target position.
-        - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
-
+            - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
+            - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
+            - The `position` parameter is set to `constants.INITIAL_Z`, specifying the target position.
+            - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
         """
         self.move_try_except(
             axis=self.axisz,
@@ -194,26 +200,25 @@ class Device:
         """
         Moves the Z-axis to the maximum Z position.
 
-        This method calls the `move_try_except` function to move the Z-axis of the device
-        to the predefined maximum Z position specified by `constants.Z_MAX`.
+        This method calls `move_try_except` to move the Z-axis of the device to the predefined 
+        maximum Z position specified by `constants.Z_MAX`.
 
-        Parameters:
-        None
+        Args:
+            None
 
-        Usage:
-        Call this method to set the Z-axis to the maximum Z position, typically used
-        for retracting the device to a safe position before starting or ending other operations.
+        Returns:
+            None
 
         Example:
-        ```python
-        device.un_focus()
-        ```
+            ```python
+            device.un_focus()
+            ```
 
         Notes:
-        - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
-        - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
-        - The `position` parameter is set to `constants.Z_MAX`, specifying the target position.
-        - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
+            - The `axis` parameter is set to `self.axisz`, representing the Z-axis of the device.
+            - The `type` parameter is set to `"move_absolute"`, indicating an absolute move command.
+            - The `position` parameter is set to `constants.Z_MAX`, specifying the target position.
+            - The `unit` parameter is set to `Units.LENGTH_MILLIMETRES`, defining the unit of measurement.
         """
         self.move_try_except(
             axis=self.axisz,

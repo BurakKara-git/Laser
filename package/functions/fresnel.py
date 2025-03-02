@@ -8,27 +8,28 @@ import package.constants as constants
 import time, csv, threading
 import numpy as np
 from typing import List
+from tkinter import Button
 
 
 def Fresnel_new(
     axes: List[Axis],
-    data,
-    dt,
-    LINEAR_VELOCITY,
-    X_CENTER,
-    Y_CENTER,
-    INITIAL_Z,
-    LINE_WIDTH,
-    RADIUS_LIST,
-    inclination,
-    w_offset,
-    R_RANGE,
+    data: list,
+    dt: float,
+    LINEAR_VELOCITY: float,
+    X_CENTER: float,
+    Y_CENTER: float,
+    INITIAL_Z: float,
+    LINE_WIDTH: float,
+    RADIUS_LIST: list,
+    inclination: float,
+    w_offset: float,
+    R_RANGE: float,
     stop_event: threading.Event,
 ):
     """
     Controls a Fresnel scanning system using linear and rotational motion.
 
-    This function moves a system along a spiral trajectory, adjusting focus dynamically
+    This function moves a system along a spiral trajectory, adjusting focus dynamically 
     based on a given height profile (`data`). The motion is defined by a combination of 
     radial and angular velocities, calculated to maintain a consistent linear velocity.
 
@@ -55,7 +56,7 @@ def Fresnel_new(
           CLV spiral, updating X and rotational movement dynamically.
         - The Z-axis adjusts focus dynamically based on the provided height profile.
         - If `stop_event` is set, the function terminates immediately.
-        - If the first ring will be executed change 'is_focused = True'
+        - If the first ring will be executed, change 'is_focused = True'.
     """
     if stop_event.is_set():
         return
@@ -204,12 +205,18 @@ def Fresnel_new(
 
 
 def Fresnel_old(
-    axes, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event: threading.Event
+    axes: list,
+    data: list,
+    X_CENTER: float,
+    Y_CENTER: float,
+    INITIAL_Z: float,
+    RADIUS_LIST: list,
+    stop_event: threading.Event,
 ):
     """
     Performs an old Fresnel scanning process.
 
-    Parameters:
+    Args:
         axes (list): List of axes.
         data (list): Height data from CSV.
         X_CENTER (float): X-axis center position in mm.
@@ -346,32 +353,32 @@ def Fresnel_old(
 
 
 def fresnel(
-    device_list,
-    dt,
-    LINEAR_VELOCITY,
-    X_CENTER,
-    Y_CENTER,
-    INITIAL_Z,
-    inclination,
-    w_offset,
-    R_RANGE,
-    LINE_WIDTH,
-    RADIUS_LIST,
+    device_list: list,
+    dt: float,
+    LINEAR_VELOCITY: float,
+    X_CENTER: float,
+    Y_CENTER: float,
+    INITIAL_Z: float,
+    inclination: float,
+    w_offset: float,
+    R_RANGE: float,
+    LINE_WIDTH: float,
+    RADIUS_LIST: list,
     lock: threading.Lock,
     stop_event: threading.Event,
-    button=None,  # If unused, set a default value
+    button: Button = None,  # If unused, set a default value
 ):
     """
     Executes Fresnel scanning by running old and new algorithms while handling concurrency.
-    
-    Parameters:
+
+    Args:
         device_list (list): List of device objects.
         dt (float): Time step for calculations.
         LINEAR_VELOCITY (float): Linear velocity in mm/s.
         X_CENTER (float): Center X coordinate in mm.
         Y_CENTER (float): Center Y coordinate in mm.
         INITIAL_Z (float): Initial Z height in mm.
-        inclination (float): Tilt angle for scanning in angles.
+        inclination (float): Tilt angle for scanning in degrees.
         w_offset (float): Angular offset in radians.
         R_RANGE (tuple): Range of radii for scanning in mm.
         LINE_WIDTH (float): Width of scan lines in mm.
@@ -401,7 +408,15 @@ def fresnel(
         if not stop_event.is_set():
             # Execute the old and new Fresnel scanning methods
             if abs(RADIUS_LIST[0][0] - RADIUS_LIST[0][1]) >= 1e-4:
-                Fresnel_old(axes_list, data, X_CENTER, Y_CENTER, INITIAL_Z, RADIUS_LIST, stop_event)
+                Fresnel_old(
+                    axes_list,
+                    data,
+                    X_CENTER,
+                    Y_CENTER,
+                    INITIAL_Z,
+                    RADIUS_LIST,
+                    stop_event,
+                )
             Fresnel_new(
                 axes_list,
                 data,

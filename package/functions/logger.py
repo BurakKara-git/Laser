@@ -12,7 +12,8 @@ def logger(
     initial_z,
     initial_rot,
 ):
-    """Logs data into a list of lists.
+    """
+    Logs data into a list of lists.
 
     Appends a new log entry consisting of the provided data to the log_tail list,
     representing a log of various parameters over time.
@@ -34,6 +35,7 @@ def logger(
     Returns:
         list: The updated log_tail list with the new log entry appended.
     """
+
     log = [
         n,
         energy,

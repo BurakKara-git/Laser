@@ -10,9 +10,10 @@ class WindowController:
     """
 
     def __init__(self, window: Tk):
-        """Initializes the Stage Controller application.
+        """
+        Initializes the Stage Controller application.
 
-        Sets up the main window with buttons, labels, entries, and progress bars for controlling
+        Sets up the main window with buttons, labels, entries, and progress bars for controlling 
         a device using the provided Tkinter window.
 
         Args:
@@ -110,7 +111,8 @@ class WindowController:
         self.progress_text.grid(column=1, row=11)
 
     def destroy(self):
-        """Destroys the main window of the Stage Controller application.
+        """
+        Destroys the main window of the Stage Controller application.
 
         Destroys the Tkinter main window, terminating the application.
 
@@ -120,9 +122,10 @@ class WindowController:
         self.window.destroy()
 
     def exit_button(self):
-        """Handler for the exit button of the Stage Controller application.
+        """
+        Handler for the exit button of the Stage Controller application.
 
-        Extracts axes positions from the device and destroys the main window,
+        Extracts axes positions from the device and destroys the main window, 
         effectively terminating the application.
 
         Args:
@@ -135,13 +138,14 @@ class WindowController:
         self.window.destroy()
 
     def get_values(self):
-        """Returns current values from entry widgets.
+        """
+        Returns current values from entry widgets.
 
-        Returns a list of current numeric values retrieved from the entry widgets
-        in the set_list attribute.
+        Returns a list of current numeric values retrieved from the entry widgets 
+        in the `set_list` attribute.
 
         Returns:
-            list: A list containing the following float values:
+            list[float]: A list containing the following float values:
                 - Index 0: X position.
                 - Index 1: Y position.
                 - Index 2: Z position.
@@ -163,7 +167,8 @@ class WindowController:
         return values
 
     def config_progress_text(self, value, total):
-        """Configures the progress text label.
+        """
+        Configures the progress text label.
 
         Updates the progress text label to display the current task and total tasks.
 
@@ -177,7 +182,8 @@ class WindowController:
         self.progress_text.config(text="Task: {}/{}".format(value, total), fg="green")
 
     def print_msg(self, MSG, color):
-        """Updates the label text and color.
+        """
+        Updates the label text and color.
 
         Updates the text and color of the label (`self.lbl`) with the provided message and color.
 
@@ -191,9 +197,10 @@ class WindowController:
         self.lbl.configure(text=MSG, fg=color)
 
     def position_msg(self, values):
-        """Updates the message labels with new values.
+        """
+        Updates the message labels with new values.
 
-        Clears existing message labels in columns 2 and 3, and then updates them
+        Clears existing message labels in columns 2 and 3, and then updates them 
         with new labels based on the provided values.
 
         Args:

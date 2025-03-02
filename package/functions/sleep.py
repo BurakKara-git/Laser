@@ -1,7 +1,8 @@
 import time
+from typing import Callable
 
 
-def sleep(duration, get_time=time.time):
+def sleep(duration: float, get_time: Callable[[], float] = time.time):
     """
     High-precision busy-wait sleep for very short durations.
 
@@ -12,7 +13,12 @@ def sleep(duration, get_time=time.time):
     Notes:
         - Uses 100% CPU while running.
         - Behavior may vary depending on system performance.
-        - Not suitable for long durations; use time.sleep() instead.
+        - Not suitable for long durations; use `time.sleep()` instead.
+        - To determine the best function for your system, run the following command in the terminal:
+        
+          ```bash
+          python -m timeit -s "from time import YOUR_FUNCTION as time" -n 1000000 "time()"
+          ```
     """
     current_time = get_time()
     end = current_time + duration

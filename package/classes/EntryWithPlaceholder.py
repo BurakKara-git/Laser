@@ -15,15 +15,16 @@ class EntryWithPlaceholder(Entry):
         col=0,
         color="grey",
     ):
-        """Initializes the widget with a placeholder and axis label.
+        """
+        Initializes the widget with a placeholder and axis label.
 
         Args:
             master (Widget): The parent widget.
             placeholder (str): The placeholder text.
             axis (str): The axis label text.
-            row (int): The row position in the grid. Defaults to 0.
-            col (int): The column position in the grid. Defaults to 0.
-            color (str): The placeholder text color. Defaults to 'grey'.
+            row (int, optional): The row position in the grid. Defaults to `0`.
+            col (int, optional): The column position in the grid. Defaults to `0`.
+            color (str, optional): The placeholder text color. Defaults to `'grey'`.
 
         Returns:
             None

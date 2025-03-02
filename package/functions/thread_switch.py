@@ -1,7 +1,8 @@
 import threading
 
 def thread_switch(main_function, start_event, args, initial_functions, final_functions):
-    """Controls the switching of a thread's state.
+    """
+    Controls the switching of a thread's state.
 
     Executes initial functions, checks the state of a start event, and either starts
     a new thread with the main function or stops the current thread and executes final functions.
